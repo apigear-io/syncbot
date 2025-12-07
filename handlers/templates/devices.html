@@ -1,0 +1,92 @@
+{{define "content"}}
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">This Device</h3>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-4">
+            <strong>Name:</strong> {{.DeviceName}}
+          </div>
+          <div class="col-md-4">
+            <strong>Location:</strong> {{if .DeviceLocation}}{{.DeviceLocation}}{{else}}-{{end}}
+          </div>
+          <div class="col-md-4">
+            <strong>IP:</strong> {{.DeviceIP}}
+          </div>
+        </div>
+        <div class="mt-2 text-muted">{{.DeviceDescription}}</div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Other Devices</h3>
+        <div class="card-actions">
+          <button class="btn btn-primary" data-bs-toggle="offcanvas" data-bs-target="#add-device-drawer">
+            <i class="ti ti-plus"></i>
+            Add Device
+          </button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Location</th>
+              <th>Description</th>
+              <th class="w-1">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="devices-table">
+            {{if .Devices}}
+              {{range $i, $d := .Devices}}
+              <tr>
+                <td><a href="{{$d.URL}}" target="_blank"><strong>{{$d.Name}}</strong></a></td>
+                <td>{{if $d.Location}}{{$d.Location}}{{else}}-{{end}}</td>
+                <td>{{if $d.Description}}{{$d.Description}}{{else}}-{{end}}</td>
+                <td>
+                  <button class="btn btn-sm btn-danger" onclick="removeDevice({{$i}})">Remove</button>
+                </td>
+              </tr>
+              {{end}}
+            {{else}}
+              <tr>
+                <td colspan="4" class="text-center text-muted">No other devices configured</td>
+              </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "view-js"}}
+document.getElementById('add-device-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const newDevice = {
+    name: document.getElementById('new-device-name').value.trim(),
+    url: document.getElementById('new-device-url').value.trim(),
+    description: document.getElementById('new-device-description').value.trim(),
+    location: document.getElementById('new-device-location').value.trim()
+  };
+
+  devices.push(newDevice);
+  await saveDevices();
+
+  bootstrap.Offcanvas.getInstance(document.getElementById('add-device-drawer')).hide();
+  showToast('Success', `Device "${newDevice.name}" added`, 'success');
+  window.location.reload();
+});
+{{end}}
+
+{{define "page-actions"}}{{end}}

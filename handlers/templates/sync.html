@@ -1,0 +1,645 @@
+{{define "content"}}
+<!-- Sync Wizard -->
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Sync Settings from Master Device</h3>
+      </div>
+      <div class="card-body">
+        <!-- Wizard Steps Indicator -->
+        <div class="steps steps-counter steps-primary mb-4" id="wizard-steps">
+          <a href="#" class="step-item active" data-step="1">Connect</a>
+          <a href="#" class="step-item" data-step="2">Settings</a>
+          <a href="#" class="step-item" data-step="3">Commands</a>
+          <a href="#" class="step-item" data-step="4">Devices</a>
+          <a href="#" class="step-item" data-step="5">Review</a>
+        </div>
+
+        <!-- Step 1: Connect -->
+        <div class="wizard-step" id="step-1">
+          <h4>Step 1: Connect to Master Device</h4>
+          <p class="text-secondary">Enter the URL of the master SyncBot device to fetch settings from.</p>
+          <div class="row mb-3">
+            <div class="col-md-8">
+              <label class="form-label">Master Device URL</label>
+              <input type="text" class="form-control" id="master-url" placeholder="http://192.168.1.100:8081">
+              <div class="form-text">The URL of another SyncBot instance (e.g., http://192.168.1.100:8081)</div>
+            </div>
+          </div>
+          <div id="connect-error" class="alert alert-danger d-none" role="alert"></div>
+          <div id="connect-success" class="alert alert-success d-none" role="alert"></div>
+          <button class="btn btn-primary" onclick="connectToMaster()">
+            <span id="connect-spinner" class="spinner-border spinner-border-sm d-none me-2" role="status"></span>
+            Connect
+          </button>
+        </div>
+
+        <!-- Step 2: Settings -->
+        <div class="wizard-step d-none" id="step-2">
+          <h4>Step 2: Device Settings</h4>
+          <p class="text-secondary">Select which settings to sync from the master device. Device-specific settings are not selected by default.</p>
+
+          <div class="mb-3">
+            <button class="btn btn-sm btn-outline-secondary me-2" onclick="selectAllSettings()">Select All Different</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="deselectAllSettings()">Deselect All</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-vcenter">
+              <thead>
+                <tr>
+                  <th style="width: 40px;">Sync</th>
+                  <th>Setting</th>
+                  <th>Master Device</th>
+                  <th>This Device</th>
+                </tr>
+              </thead>
+              <tbody id="settings-table-body">
+                <!-- Populated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+
+          <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-secondary" onclick="goToStep(1)">Back</button>
+            <button class="btn btn-primary" onclick="goToStep(3)">Next</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Commands -->
+        <div class="wizard-step d-none" id="step-3">
+          <h4>Step 3: Commands</h4>
+          <p class="text-secondary">Review commands from the master device. You can add new commands or replace existing ones.</p>
+
+          <div class="mb-3">
+            <button class="btn btn-sm btn-outline-secondary me-2" onclick="selectAllCommands()">Select All</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="deselectAllCommands()">Deselect All</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-vcenter">
+              <thead>
+                <tr>
+                  <th style="width: 40px;">Sync</th>
+                  <th>Command ID</th>
+                  <th>Name</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="commands-table-body">
+                <!-- Populated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+          <div id="no-commands-message" class="text-secondary d-none">No commands to sync.</div>
+
+          <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-secondary" onclick="goToStep(2)">Back</button>
+            <button class="btn btn-primary" onclick="goToStep(4)">Next</button>
+          </div>
+        </div>
+
+        <!-- Step 4: Devices Registry -->
+        <div class="wizard-step d-none" id="step-4">
+          <h4>Step 4: Device Registry</h4>
+          <p class="text-secondary">Review devices from the master's registry. You can add new devices or replace existing ones.</p>
+
+          <div class="mb-3">
+            <button class="btn btn-sm btn-outline-secondary me-2" onclick="selectAllDevices()">Select All</button>
+            <button class="btn btn-sm btn-outline-secondary" onclick="deselectAllDevices()">Deselect All</button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table table-vcenter">
+              <thead>
+                <tr>
+                  <th style="width: 40px;">Sync</th>
+                  <th>Device Name</th>
+                  <th>URL</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="devices-table-body">
+                <!-- Populated by JavaScript -->
+              </tbody>
+            </table>
+          </div>
+          <div id="no-devices-message" class="text-secondary d-none">No devices to sync.</div>
+
+          <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-secondary" onclick="goToStep(3)">Back</button>
+            <button class="btn btn-primary" onclick="goToStep(5)">Next</button>
+          </div>
+        </div>
+
+        <!-- Step 5: Review & Apply -->
+        <div class="wizard-step d-none" id="step-5">
+          <h4>Step 5: Review & Apply</h4>
+          <p class="text-secondary">Review the changes that will be applied to this device.</p>
+
+          <div id="review-summary">
+            <!-- Populated by JavaScript -->
+          </div>
+
+          <div id="apply-error" class="alert alert-danger d-none mt-3" role="alert"></div>
+          <div id="apply-success" class="alert alert-success d-none mt-3" role="alert"></div>
+
+          <div class="d-flex gap-2 mt-3">
+            <button class="btn btn-secondary" onclick="goToStep(4)" id="back-btn">Back</button>
+            <button class="btn btn-primary" onclick="applySettings()" id="apply-btn">
+              <span id="apply-spinner" class="spinner-border spinner-border-sm d-none me-2" role="status"></span>
+              Apply Changes
+            </button>
+            <button class="btn btn-success d-none" onclick="window.location.href='/settings'" id="done-btn">Done</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "view-js"}}
+// State
+let masterSettings = null;
+let localSettings = null;
+let currentStep = 1;
+
+// Selected items for sync
+const selectedSettings = new Map();
+const selectedCommands = new Set();
+const selectedDevices = new Set();
+
+// Settings metadata
+const settingsConfig = [
+  { key: 'device_name', label: 'Device Name', deviceSpecific: true },
+  { key: 'device_description', label: 'Device Description', deviceSpecific: true },
+  { key: 'device_location', label: 'Device Location', deviceSpecific: true },
+  { key: 'endpoints_path', label: 'Endpoints Path', deviceSpecific: true },
+  { key: 'active_symlink', label: 'Active Symlink', deviceSpecific: true },
+  { key: 'post_activation_command', label: 'Post-Activation Command', deviceSpecific: false },
+  { key: 'device_ip', label: 'Device IP', deviceSpecific: true },
+  { key: 'ssh_username', label: 'SSH Username', deviceSpecific: false }
+];
+
+// Load saved master URL
+document.addEventListener('DOMContentLoaded', () => {
+  const savedUrl = localStorage.getItem('syncbot_master_url');
+  if (savedUrl) {
+    document.getElementById('master-url').value = savedUrl;
+  }
+});
+
+async function connectToMaster() {
+  const urlInput = document.getElementById('master-url');
+  const errorDiv = document.getElementById('connect-error');
+  const successDiv = document.getElementById('connect-success');
+  const spinner = document.getElementById('connect-spinner');
+
+  const masterUrl = urlInput.value.trim();
+  if (!masterUrl) {
+    errorDiv.textContent = 'Please enter a master device URL';
+    errorDiv.classList.remove('d-none');
+    successDiv.classList.add('d-none');
+    return;
+  }
+
+  // Save URL to localStorage
+  localStorage.setItem('syncbot_master_url', masterUrl);
+
+  spinner.classList.remove('d-none');
+  errorDiv.classList.add('d-none');
+  successDiv.classList.add('d-none');
+
+  try {
+    const response = await fetch('/api/sync/fetch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ masterUrl: masterUrl })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to connect to master device');
+    }
+
+    masterSettings = data.master;
+    localSettings = data.local;
+
+    successDiv.innerHTML = `<strong>Connected!</strong> Successfully fetched settings from <code>${escapeHtml(masterUrl)}</code>`;
+    successDiv.classList.remove('d-none');
+
+    // Initialize selections
+    initializeSelections();
+
+    // Move to step 2 after a short delay
+    setTimeout(() => goToStep(2), 500);
+  } catch (error) {
+    errorDiv.textContent = error.message;
+    errorDiv.classList.remove('d-none');
+  } finally {
+    spinner.classList.add('d-none');
+  }
+}
+
+function initializeSelections() {
+  // Clear previous selections
+  selectedSettings.clear();
+  selectedCommands.clear();
+  selectedDevices.clear();
+
+  // Pre-select settings that differ and are not device-specific
+  settingsConfig.forEach(config => {
+    const masterVal = masterSettings[config.key] || '';
+    const localVal = localSettings[config.key] || '';
+    const isDifferent = masterVal !== localVal;
+
+    // Select if different and not device-specific
+    if (isDifferent && !config.deviceSpecific) {
+      selectedSettings.set(config.key, masterSettings[config.key]);
+    }
+  });
+
+  // Pre-select new or modified commands
+  masterSettings.commands.forEach(masterCmd => {
+    const localCmd = localSettings.commands.find(c => c.id === masterCmd.id);
+    if (!localCmd || commandsDiffer(masterCmd, localCmd)) {
+      selectedCommands.add(masterCmd.id);
+    }
+  });
+
+  // Pre-select new or modified devices
+  masterSettings.devices.forEach(masterDev => {
+    const localDev = localSettings.devices.find(d => d.name === masterDev.name);
+    if (!localDev || devicesDiffer(masterDev, localDev)) {
+      selectedDevices.add(masterDev.name);
+    }
+  });
+}
+
+function commandsDiffer(a, b) {
+  return a.name !== b.name || a.description !== b.description || a.command !== b.command;
+}
+
+function devicesDiffer(a, b) {
+  return a.url !== b.url || a.description !== b.description || a.location !== b.location;
+}
+
+function goToStep(step) {
+  // Hide all steps
+  document.querySelectorAll('.wizard-step').forEach(el => el.classList.add('d-none'));
+
+  // Show target step
+  document.getElementById(`step-${step}`).classList.remove('d-none');
+
+  // Update step indicators
+  document.querySelectorAll('#wizard-steps .step-item').forEach((el, idx) => {
+    if (idx + 1 < step) {
+      el.classList.remove('active');
+      el.classList.add('done');
+    } else if (idx + 1 === step) {
+      el.classList.add('active');
+      el.classList.remove('done');
+    } else {
+      el.classList.remove('active', 'done');
+    }
+  });
+
+  currentStep = step;
+
+  // Render step content
+  if (step === 2) renderSettingsTable();
+  if (step === 3) renderCommandsTable();
+  if (step === 4) renderDevicesTable();
+  if (step === 5) renderReviewSummary();
+}
+
+function renderSettingsTable() {
+  const tbody = document.getElementById('settings-table-body');
+  tbody.innerHTML = '';
+
+  settingsConfig.forEach(config => {
+    const masterVal = masterSettings[config.key] || '';
+    const localVal = localSettings[config.key] || '';
+    const isDifferent = masterVal !== localVal;
+    const isSelected = selectedSettings.has(config.key);
+
+    const tr = document.createElement('tr');
+    tr.className = isDifferent ? '' : 'text-muted';
+    tr.innerHTML = `
+      <td>
+        <input type="checkbox" class="form-check-input"
+               onchange="toggleSetting('${config.key}', this.checked)"
+               ${isSelected ? 'checked' : ''}>
+      </td>
+      <td>
+        ${escapeHtml(config.label)}
+        ${config.deviceSpecific ? '<span class="badge bg-yellow-lt ms-2">Device-specific</span>' : ''}
+      </td>
+      <td><code>${escapeHtml(masterVal) || '<em class="text-muted">empty</em>'}</code></td>
+      <td><code>${escapeHtml(localVal) || '<em class="text-muted">empty</em>'}</code></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderCommandsTable() {
+  const tbody = document.getElementById('commands-table-body');
+  const noMsg = document.getElementById('no-commands-message');
+  tbody.innerHTML = '';
+
+  if (masterSettings.commands.length === 0) {
+    tbody.parentElement.classList.add('d-none');
+    noMsg.classList.remove('d-none');
+    return;
+  }
+
+  tbody.parentElement.classList.remove('d-none');
+  noMsg.classList.add('d-none');
+
+  masterSettings.commands.forEach(masterCmd => {
+    const localCmd = localSettings.commands.find(c => c.id === masterCmd.id);
+    let status = 'New';
+    let statusClass = 'bg-green-lt';
+
+    if (localCmd) {
+      if (commandsDiffer(masterCmd, localCmd)) {
+        status = 'Modified';
+        statusClass = 'bg-yellow-lt';
+      } else {
+        status = 'Unchanged';
+        statusClass = 'bg-secondary-lt';
+      }
+    }
+
+    const isSelected = selectedCommands.has(masterCmd.id);
+    const tr = document.createElement('tr');
+    tr.className = status === 'Unchanged' ? 'text-muted' : '';
+    tr.innerHTML = `
+      <td>
+        <input type="checkbox" class="form-check-input"
+               onchange="toggleCommand('${masterCmd.id}', this.checked)"
+               ${isSelected ? 'checked' : ''}>
+      </td>
+      <td><code>${escapeHtml(masterCmd.id)}</code></td>
+      <td>${escapeHtml(masterCmd.name)}</td>
+      <td><span class="badge ${statusClass}">${status}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderDevicesTable() {
+  const tbody = document.getElementById('devices-table-body');
+  const noMsg = document.getElementById('no-devices-message');
+  tbody.innerHTML = '';
+
+  if (masterSettings.devices.length === 0) {
+    tbody.parentElement.classList.add('d-none');
+    noMsg.classList.remove('d-none');
+    return;
+  }
+
+  tbody.parentElement.classList.remove('d-none');
+  noMsg.classList.add('d-none');
+
+  masterSettings.devices.forEach(masterDev => {
+    const localDev = localSettings.devices.find(d => d.name === masterDev.name);
+    let status = 'New';
+    let statusClass = 'bg-green-lt';
+
+    if (localDev) {
+      if (devicesDiffer(masterDev, localDev)) {
+        status = 'Modified';
+        statusClass = 'bg-yellow-lt';
+      } else {
+        status = 'Unchanged';
+        statusClass = 'bg-secondary-lt';
+      }
+    }
+
+    const isSelected = selectedDevices.has(masterDev.name);
+    const tr = document.createElement('tr');
+    tr.className = status === 'Unchanged' ? 'text-muted' : '';
+    tr.innerHTML = `
+      <td>
+        <input type="checkbox" class="form-check-input"
+               onchange="toggleDevice('${escapeHtml(masterDev.name)}', this.checked)"
+               ${isSelected ? 'checked' : ''}>
+      </td>
+      <td>${escapeHtml(masterDev.name)}</td>
+      <td><code>${escapeHtml(masterDev.url)}</code></td>
+      <td><span class="badge ${statusClass}">${status}</span></td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+function renderReviewSummary() {
+  const summary = document.getElementById('review-summary');
+  let html = '';
+
+  // Settings
+  const settingChanges = [];
+  selectedSettings.forEach((value, key) => {
+    const config = settingsConfig.find(c => c.key === key);
+    settingChanges.push(`<li><strong>${escapeHtml(config.label)}:</strong> <code>${escapeHtml(value) || '<em>empty</em>'}</code></li>`);
+  });
+
+  if (settingChanges.length > 0) {
+    html += `
+      <div class="mb-3">
+        <h5>Settings to update (${settingChanges.length})</h5>
+        <ul class="mb-0">${settingChanges.join('')}</ul>
+      </div>
+    `;
+  }
+
+  // Commands
+  const commandChanges = [];
+  selectedCommands.forEach(id => {
+    const cmd = masterSettings.commands.find(c => c.id === id);
+    if (cmd) {
+      const localCmd = localSettings.commands.find(c => c.id === id);
+      const action = localCmd ? 'Replace' : 'Add';
+      commandChanges.push(`<li><strong>${action}:</strong> ${escapeHtml(cmd.name)} (<code>${escapeHtml(id)}</code>)</li>`);
+    }
+  });
+
+  if (commandChanges.length > 0) {
+    html += `
+      <div class="mb-3">
+        <h5>Commands to sync (${commandChanges.length})</h5>
+        <ul class="mb-0">${commandChanges.join('')}</ul>
+      </div>
+    `;
+  }
+
+  // Devices
+  const deviceChanges = [];
+  selectedDevices.forEach(name => {
+    const dev = masterSettings.devices.find(d => d.name === name);
+    if (dev) {
+      const localDev = localSettings.devices.find(d => d.name === name);
+      const action = localDev ? 'Replace' : 'Add';
+      deviceChanges.push(`<li><strong>${action}:</strong> ${escapeHtml(name)} (<code>${escapeHtml(dev.url)}</code>)</li>`);
+    }
+  });
+
+  if (deviceChanges.length > 0) {
+    html += `
+      <div class="mb-3">
+        <h5>Devices to sync (${deviceChanges.length})</h5>
+        <ul class="mb-0">${deviceChanges.join('')}</ul>
+      </div>
+    `;
+  }
+
+  if (!html) {
+    html = '<div class="alert alert-info">No changes selected. Go back to select items to sync.</div>';
+  }
+
+  summary.innerHTML = html;
+}
+
+function toggleSetting(key, checked) {
+  if (checked) {
+    selectedSettings.set(key, masterSettings[key]);
+  } else {
+    selectedSettings.delete(key);
+  }
+}
+
+function toggleCommand(id, checked) {
+  if (checked) {
+    selectedCommands.add(id);
+  } else {
+    selectedCommands.delete(id);
+  }
+}
+
+function toggleDevice(name, checked) {
+  if (checked) {
+    selectedDevices.add(name);
+  } else {
+    selectedDevices.delete(name);
+  }
+}
+
+function selectAllSettings() {
+  settingsConfig.forEach(config => {
+    const masterVal = masterSettings[config.key] || '';
+    const localVal = localSettings[config.key] || '';
+    if (masterVal !== localVal) {
+      selectedSettings.set(config.key, masterSettings[config.key]);
+    }
+  });
+  renderSettingsTable();
+}
+
+function deselectAllSettings() {
+  selectedSettings.clear();
+  renderSettingsTable();
+}
+
+function selectAllCommands() {
+  masterSettings.commands.forEach(cmd => selectedCommands.add(cmd.id));
+  renderCommandsTable();
+}
+
+function deselectAllCommands() {
+  selectedCommands.clear();
+  renderCommandsTable();
+}
+
+function selectAllDevices() {
+  masterSettings.devices.forEach(dev => selectedDevices.add(dev.name));
+  renderDevicesTable();
+}
+
+function deselectAllDevices() {
+  selectedDevices.clear();
+  renderDevicesTable();
+}
+
+async function applySettings() {
+  const errorDiv = document.getElementById('apply-error');
+  const successDiv = document.getElementById('apply-success');
+  const spinner = document.getElementById('apply-spinner');
+  const applyBtn = document.getElementById('apply-btn');
+  const backBtn = document.getElementById('back-btn');
+  const doneBtn = document.getElementById('done-btn');
+
+  // Build the request
+  const request = {};
+
+  // Add selected settings
+  selectedSettings.forEach((value, key) => {
+    request[key] = value;
+  });
+
+  // Add selected commands - merge with local commands
+  if (selectedCommands.size > 0) {
+    // Start with local commands that are NOT being replaced
+    const commandsToKeep = localSettings.commands.filter(c => !selectedCommands.has(c.id));
+    // Add selected commands from master
+    const commandsToAdd = masterSettings.commands.filter(c => selectedCommands.has(c.id));
+    request.commands = [...commandsToKeep, ...commandsToAdd];
+  }
+
+  // Add selected devices - merge with local devices
+  if (selectedDevices.size > 0) {
+    // Start with local devices that are NOT being replaced
+    const devicesToKeep = localSettings.devices.filter(d => !selectedDevices.has(d.name));
+    // Add selected devices from master
+    const devicesToAdd = masterSettings.devices.filter(d => selectedDevices.has(d.name));
+    request.devices = [...devicesToKeep, ...devicesToAdd];
+  }
+
+  spinner.classList.remove('d-none');
+  errorDiv.classList.add('d-none');
+  successDiv.classList.add('d-none');
+  applyBtn.disabled = true;
+  backBtn.disabled = true;
+
+  try {
+    const response = await fetch('/api/sync/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to apply settings');
+    }
+
+    let message = data.message || 'Settings applied successfully!';
+    if (data.needsReload) {
+      message += ' Some changes may require a page reload to take effect.';
+    }
+
+    successDiv.innerHTML = `<strong>Success!</strong> ${escapeHtml(message)}`;
+    successDiv.classList.remove('d-none');
+
+    // Show Done button, hide Apply button
+    applyBtn.classList.add('d-none');
+    doneBtn.classList.remove('d-none');
+    backBtn.classList.add('d-none');
+
+    showToast('Sync Complete', message, 'success');
+  } catch (error) {
+    errorDiv.textContent = error.message;
+    errorDiv.classList.remove('d-none');
+    applyBtn.disabled = false;
+    backBtn.disabled = false;
+  } finally {
+    spinner.classList.add('d-none');
+  }
+}
+{{end}}
+
+{{define "page-actions"}}{{end}}

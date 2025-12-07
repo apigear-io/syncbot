@@ -1,0 +1,63 @@
+{{define "view-help"}}
+<ul class="nav nav-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#help-tab-overview" type="button">Overview</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#help-tab-syncing" type="button">Syncing</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#help-tab-activation" type="button">Activation</button>
+  </li>
+</ul>
+<div class="tab-content mt-3">
+  <div class="tab-pane fade show active" id="help-tab-overview" role="tabpanel">
+    <h4>Managing Endpoints</h4>
+    <h5>Creating an Endpoint</h5>
+    <p>Click <strong>Create Endpoint</strong> and enter:</p>
+    <ul>
+      <li><strong>Endpoint Name:</strong> A unique identifier (e.g., "feature-xyz", "john-test")</li>
+      <li><strong>Owner:</strong> Your name, so others know who to contact</li>
+    </ul>
+    <h5>Deleting an Endpoint</h5>
+    <p>Click <strong>Delete</strong> on your endpoint. You must enter your owner name to confirm. Note: You cannot delete the currently active endpoint.</p>
+    <h5>Naming Rules</h5>
+    <p>Endpoint names must be alphanumeric with hyphens only (e.g., "my-release-v2").</p>
+  </div>
+  <div class="tab-pane fade" id="help-tab-syncing" role="tabpanel">
+    <h4>Syncing Your Software</h4>
+    <h5>Getting the rsync Command</h5>
+    <p>Click the <strong>rsync</strong> button on your endpoint to get the exact command.</p>
+    <h5>Command Format</h5>
+    <pre class="bg-light p-2 rounded"><code>rsync -avzc --delete /local/path/ user@device:/path/to/endpoint/</code></pre>
+    <h5>Flags Explained</h5>
+    <ul>
+      <li><code>-a</code> Archive mode (preserves permissions, timestamps)</li>
+      <li><code>-v</code> Verbose output</li>
+      <li><code>-z</code> Compress during transfer</li>
+      <li><code>-c</code> Use checksum to verify file integrity</li>
+      <li><code>--delete</code> Remove files on target that don't exist locally</li>
+    </ul>
+    <h5>Platform-Specific Paths</h5>
+    <p><strong>macOS / Linux:</strong></p>
+    <pre class="bg-light p-2 rounded"><code>/Users/name/releases/v1.0/</code></pre>
+    <p><strong>Windows (Git Bash):</strong></p>
+    <pre class="bg-light p-2 rounded"><code>/c/Users/name/releases/v1.0/</code></pre>
+    <p><strong>Windows (WSL):</strong></p>
+    <pre class="bg-light p-2 rounded"><code>/mnt/c/Users/name/releases/v1.0/</code></pre>
+  </div>
+  <div class="tab-pane fade" id="help-tab-activation" role="tabpanel">
+    <h4>Activating Endpoints</h4>
+    <h5>What Activation Does</h5>
+    <ol>
+      <li>Updates the symlink to point to your endpoint</li>
+      <li>Runs the configured post-activation command</li>
+    </ol>
+    <h5>Before Activating</h5>
+    <p>Check who currently has the active endpoint and coordinate with them if needed.</p>
+    <div class="alert alert-warning">
+      <strong>Note:</strong> Activating an endpoint may interrupt testing for the current user. Always coordinate with your team!
+    </div>
+  </div>
+</div>
+{{end}}

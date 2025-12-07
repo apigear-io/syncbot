@@ -1,0 +1,40 @@
+{{define "view-help"}}
+<ul class="nav nav-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#help-tab-overview" type="button">Overview</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#help-tab-csv" type="button">CSV Import</button>
+  </li>
+</ul>
+<div class="tab-content mt-3">
+  <div class="tab-pane fade show active" id="help-tab-overview" role="tabpanel">
+    <h4>Device Registry</h4>
+    <p>The Devices view shows all SyncBot instances in your network. This helps users quickly navigate between different test devices.</p>
+    <h5>Adding Devices</h5>
+    <p>Click <strong>Add Device</strong> to add devices individually or import multiple devices at once.</p>
+    <h5>Device Fields</h5>
+    <ul>
+      <li><strong>Name:</strong> Device display name (required)</li>
+      <li><strong>URL:</strong> Full URL to SyncBot instance (required)</li>
+      <li><strong>Description:</strong> Brief description (optional)</li>
+      <li><strong>Location:</strong> Physical location (optional)</li>
+    </ul>
+  </div>
+  <div class="tab-pane fade" id="help-tab-csv" role="tabpanel">
+    <h4>CSV Import</h4>
+    <p>To quickly add multiple devices, use the CSV Import tab. Paste your device list in CSV format:</p>
+    <pre class="bg-light p-2 rounded" style="font-size: 0.85rem;"><code>name,url,description,location
+device-01,http://192.168.1.100:8081,Primary,Room 101
+device-02,http://192.168.1.101:8081,Secondary,Room 102</code></pre>
+    <h5>Options</h5>
+    <ul>
+      <li><strong>Replace all:</strong> Removes existing devices and imports only the CSV data</li>
+      <li><strong>Append:</strong> Adds CSV devices to existing list (default)</li>
+    </ul>
+    <div class="alert alert-info">
+      <strong>Tip:</strong> The header row is optional and will be auto-detected and skipped.
+    </div>
+  </div>
+</div>
+{{end}}

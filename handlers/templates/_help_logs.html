@@ -1,0 +1,80 @@
+{{define "view-help"}}
+<ul class="nav nav-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#help-tab-overview" type="button">Overview</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#help-tab-levels" type="button">Log Levels</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#help-tab-filtering" type="button">Filtering</button>
+  </li>
+</ul>
+<div class="tab-content mt-3">
+  <div class="tab-pane fade show active" id="help-tab-overview" role="tabpanel">
+    <h4>Application Logs</h4>
+    <p>View and search SyncBot application logs. Logs are stored in memory and cleared on restart.</p>
+    <h5>Features</h5>
+    <ul>
+      <li><strong>Search:</strong> Filter logs by message content</li>
+      <li><strong>Level Filter:</strong> Show only specific log levels</li>
+      <li><strong>Auto-refresh:</strong> Automatically update logs every 5 seconds</li>
+      <li><strong>Clear:</strong> Remove all log entries</li>
+    </ul>
+    <h5>Log Entry Fields</h5>
+    <ul>
+      <li><strong>Timestamp:</strong> When the event occurred</li>
+      <li><strong>Level:</strong> Severity (error, warn, info, debug)</li>
+      <li><strong>Component:</strong> Source module (http, activation, etc.)</li>
+      <li><strong>Message:</strong> Event description</li>
+    </ul>
+  </div>
+  <div class="tab-pane fade" id="help-tab-levels" role="tabpanel">
+    <h4>Log Levels</h4>
+    <table class="table table-sm">
+      <thead>
+        <tr>
+          <th>Level</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="badge bg-danger text-white">error</span></td>
+          <td>Critical errors requiring attention</td>
+        </tr>
+        <tr>
+          <td><span class="badge bg-warning text-dark">warn</span></td>
+          <td>Warning conditions that may need review</td>
+        </tr>
+        <tr>
+          <td><span class="badge bg-info text-white">info</span></td>
+          <td>Informational messages about normal operations</td>
+        </tr>
+        <tr>
+          <td><span class="badge bg-secondary text-white">debug</span></td>
+          <td>Detailed debugging information</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="alert alert-info">
+      <strong>Tip:</strong> Filter by "error" level to quickly find problems.
+    </div>
+  </div>
+  <div class="tab-pane fade" id="help-tab-filtering" role="tabpanel">
+    <h4>Filtering Logs</h4>
+    <h5>Text Search</h5>
+    <p>Type in the search box to filter logs by message content. Search is case-insensitive.</p>
+    <p>Example searches:</p>
+    <ul>
+      <li><code>endpoint</code> - Show endpoint-related events</li>
+      <li><code>activation</code> - Show activation events</li>
+      <li><code>failed</code> - Show failure messages</li>
+    </ul>
+    <h5>Level Filter</h5>
+    <p>Use the dropdown to show only logs of a specific severity level.</p>
+    <h5>Combining Filters</h5>
+    <p>Text search and level filter can be combined. For example, select "Errors" and search for "activation" to see only activation-related errors.</p>
+  </div>
+</div>
+{{end}}

@@ -1,0 +1,44 @@
+{{define "view-help"}}
+<ul class="nav nav-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#help-tab-overview" type="button">Overview</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#help-tab-workflow" type="button">Workflow</button>
+  </li>
+</ul>
+<div class="tab-content mt-3">
+  <div class="tab-pane fade show active" id="help-tab-overview" role="tabpanel">
+    <h4>Settings Sync</h4>
+    <p>The sync feature allows you to copy configuration from a "master" SyncBot device to this device. This is useful when managing multiple instances across different machines.</p>
+    <h5>How It Works</h5>
+    <ul>
+      <li><strong>Pull-based:</strong> This device fetches settings from the master</li>
+      <li><strong>Selective:</strong> You choose exactly what to sync</li>
+      <li><strong>Non-destructive:</strong> Only selected items are changed</li>
+    </ul>
+    <h5>What Can Be Synced</h5>
+    <ul>
+      <li>Device information (name, description, location)</li>
+      <li>Path settings (endpoints, symlinks)</li>
+      <li>Network settings (IP, SSH username)</li>
+      <li>User-defined commands</li>
+      <li>Device registry</li>
+    </ul>
+  </div>
+  <div class="tab-pane fade" id="help-tab-workflow" role="tabpanel">
+    <h4>Sync Workflow</h4>
+    <ol>
+      <li><strong>Connect:</strong> Enter the master device URL and connect</li>
+      <li><strong>Settings:</strong> Review and select device settings to sync</li>
+      <li><strong>Commands:</strong> Select commands to add or replace</li>
+      <li><strong>Devices:</strong> Select device registry entries to sync</li>
+      <li><strong>Review:</strong> Confirm your selections and apply</li>
+    </ol>
+    <h5>Smart Defaults</h5>
+    <p>The wizard pre-selects items that differ between devices, except for device-specific settings like paths and IP addresses which you typically want to keep unique per device.</p>
+    <h5>Master URL Memory</h5>
+    <p>The master URL is saved in your browser so you don't need to re-enter it next time.</p>
+  </div>
+</div>
+{{end}}

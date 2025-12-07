@@ -1,0 +1,137 @@
+{{define "content"}}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Application Logs</h3>
+    <div class="card-actions">
+      <div class="d-flex gap-2 align-items-center">
+        <div class="input-group input-group-sm" style="width: 200px;">
+          <span class="input-group-text">
+            <i class="ti ti-search"></i>
+          </span>
+          <input type="text" class="form-control" id="log-search" placeholder="Search logs..." oninput="loadLogs()">
+        </div>
+        <select class="form-select form-select-sm" id="log-level-filter" style="width: 120px;" onchange="loadLogs()">
+          <option value="all">All Levels</option>
+          <option value="error">Errors</option>
+          <option value="warn">Warnings</option>
+          <option value="info">Info</option>
+          <option value="debug">Debug</option>
+        </select>
+        <button class="btn btn-sm btn-secondary" onclick="loadLogs()">
+          <i class="ti ti-refresh"></i>
+          Refresh
+        </button>
+        <button class="btn btn-sm btn-danger" onclick="clearLogs()">Clear</button>
+      </div>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive" style="max-height: calc(100vh - 220px); overflow-y: auto;">
+      <table class="table table-vcenter card-table table-striped table-sm">
+        <thead style="position: sticky; top: 0; background: var(--tblr-card-bg);">
+          <tr>
+            <th style="width: 180px; white-space: nowrap;">Timestamp</th>
+            <th style="width: 80px;">Level</th>
+            <th style="width: 100px;">Component</th>
+            <th>Message</th>
+          </tr>
+        </thead>
+        <tbody id="logs-tbody">
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer">
+    <div class="d-flex justify-content-between align-items-center">
+      <span class="text-muted" id="logs-count">0 entries</span>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="auto-refresh-logs">
+        <label class="form-check-label" for="auto-refresh-logs">Auto-refresh (2s)</label>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "view-js"}}
+let logsAutoRefreshInterval = null;
+
+async function loadLogs() {
+  const level = document.getElementById('log-level-filter').value;
+  const search = document.getElementById('log-search').value;
+
+  try {
+    let url = `/api/logs?limit=200`;
+    if (level && level !== 'all') {
+      url += `&level=${encodeURIComponent(level)}`;
+    }
+    if (search) {
+      url += `&search=${encodeURIComponent(search)}`;
+    }
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    const tbody = document.getElementById('logs-tbody');
+    if (data.entries.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No log entries found</td></tr>';
+    } else {
+      tbody.innerHTML = data.entries.map(entry => `
+        <tr>
+          <td class="text-muted" style="white-space: nowrap;">${escapeHtml(formatTimestamp(entry.timestamp))}</td>
+          <td>${getLevelBadge(entry.level)}</td>
+          <td><code>${escapeHtml(entry.component)}</code></td>
+          <td>${escapeHtml(entry.message)}</td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('logs-count').textContent = `${data.entries.length} of ${data.total} entries`;
+  } catch (error) {
+    showToast('Error', 'Failed to load logs', 'danger');
+  }
+}
+
+function formatTimestamp(ts) {
+  const date = new Date(ts);
+  return date.toLocaleTimeString() + '.' + String(date.getMilliseconds()).padStart(3, '0');
+}
+
+function getLevelBadge(level) {
+  const badges = {
+    error: 'bg-danger text-white',
+    warn: 'bg-warning text-dark',
+    info: 'bg-info text-white',
+    debug: 'bg-secondary text-white'
+  };
+  const classes = badges[level] || 'bg-secondary text-white';
+  return `<span class="badge ${classes}">${escapeHtml(level)}</span>`;
+}
+
+async function clearLogs() {
+  try {
+    await fetch('/api/logs', { method: 'DELETE' });
+    loadLogs();
+    showToast('Success', 'Logs cleared', 'success');
+  } catch (error) {
+    showToast('Error', 'Failed to clear logs', 'danger');
+  }
+}
+
+// Auto-refresh toggle
+document.getElementById('auto-refresh-logs').addEventListener('change', function() {
+  if (this.checked) {
+    logsAutoRefreshInterval = setInterval(loadLogs, 2000);
+  } else {
+    if (logsAutoRefreshInterval) {
+      clearInterval(logsAutoRefreshInterval);
+      logsAutoRefreshInterval = null;
+    }
+  }
+});
+
+// Initial load
+loadLogs();
+{{end}}
+
+{{define "page-actions"}}{{end}}

@@ -1,0 +1,113 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SyncBot - {{.Title}}</title>
+  <link rel="stylesheet" href="/static/css/tabler.min.css">
+  <link rel="stylesheet" href="/static/css/tabler-icons.min.css">
+  <style>
+    .navbar-dark .nav-link { color: rgba(255, 255, 255, 0.7); }
+    .navbar-dark .nav-link:hover { color: rgba(255, 255, 255, 1); }
+    .navbar-dark .nav-link.active { color: #ffffff; background-color: rgba(255, 255, 255, 0.1); }
+    /* Fix code styling in light-themed drawers */
+    [data-bs-theme="light"] code { color: #d63384; background-color: #f8f9fa; padding: 0.125rem 0.25rem; border-radius: 0.25rem; }
+    [data-bs-theme="light"] pre { background-color: #f8f9fa; color: #1e293b; }
+    [data-bs-theme="light"] pre code { background-color: transparent; padding: 0; }
+  </style>
+</head>
+<body class="theme-light">
+  <div class="page">
+    <aside class="navbar navbar-vertical navbar-expand-lg navbar-dark bg-dark">
+      <div class="container-fluid">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="navbar-brand w-100 text-center py-3 d-flex flex-column align-items-center">
+          <div class="text-white fs-3 fw-bold">SyncBot</div>
+          <div class="text-white-50 small mt-1">{{.DeviceName}}</div>
+        </div>
+        <div class="collapse navbar-collapse" id="navbar-menu">
+          <hr class="my-2 border-secondary">
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link{{if eq .ActiveView "endpoints"}} active{{end}}" href="/endpoints">
+                <span class="nav-link-icon"><i class="ti ti-database"></i></span>
+                <span class="nav-link-title">Endpoints</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link{{if eq .ActiveView "devices"}} active{{end}}" href="/devices">
+                <span class="nav-link-icon"><i class="ti ti-devices"></i></span>
+                <span class="nav-link-title">Devices</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link{{if eq .ActiveView "terminal"}} active{{end}}" href="/terminal">
+                <span class="nav-link-icon"><i class="ti ti-terminal-2"></i></span>
+                <span class="nav-link-title">Terminal</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link{{if eq .ActiveView "logs"}} active{{end}}" href="/logs">
+                <span class="nav-link-icon"><i class="ti ti-list-details"></i></span>
+                <span class="nav-link-title">Logs</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link{{if or (eq .ActiveView "settings") (eq .ActiveView "sync")}} active{{end}}" href="/settings">
+                <span class="nav-link-icon"><i class="ti ti-settings"></i></span>
+                <span class="nav-link-title">Settings</span>
+              </a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+    <div class="page-wrapper">
+      <div class="page-header d-print-none">
+        <div class="container-xl">
+          <div class="d-flex justify-content-between align-items-center">
+            <h2 class="page-title mb-0">{{.Title}}</h2>
+            <div class="d-flex gap-2">
+              {{template "page-actions" .}}
+              <button class="btn btn-outline-secondary" data-bs-toggle="offcanvas" data-bs-target="#help-drawer">
+                <i class="ti ti-help-circle"></i>
+                Help
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="page-body">
+        <div class="container-xl">
+          {{template "content" .}}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {{template "modals" .}}
+  {{template "drawers" .}}
+
+  <!-- Toast Container -->
+  <div class="toast-container position-fixed bottom-0 end-0 p-3">
+    <div id="toast" class="toast" role="alert">
+      <div class="toast-header">
+        <strong class="me-auto" id="toast-title">Notification</strong>
+        <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+      </div>
+      <div class="toast-body" id="toast-body"></div>
+    </div>
+  </div>
+
+  <script src="/static/js/tabler.min.js"></script>
+  <script>
+    {{template "shared-js" .}}
+    {{template "view-js" .}}
+  </script>
+</body>
+</html>
+{{end}}

@@ -1,0 +1,151 @@
+{{define "content"}}
+<!-- Device Settings -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Device Information</h3>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <label class="form-label">Device Name</label>
+            <input type="text" class="form-control" id="settings-device-name" value="{{.DeviceName}}" placeholder="test-device-01">
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label">Location</label>
+            <input type="text" class="form-control" id="settings-device-location" value="{{.DeviceLocation}}" placeholder="Room 101">
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label">Description</label>
+            <input type="text" class="form-control" id="settings-device-description" value="{{.DeviceDescription}}" placeholder="Main test device">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Network Settings -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Network</h3>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-4 mb-3">
+            <label class="form-label">Device IP / Hostname</label>
+            <input type="text" class="form-control" id="settings-device-ip" value="{{.DeviceIP}}" placeholder="192.168.1.100">
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label">SSH Username</label>
+            <input type="text" class="form-control" id="settings-ssh-username" value="{{.SSHUsername}}" placeholder="sync">
+          </div>
+          <div class="col-md-4 mb-3">
+            <label class="form-label">Port</label>
+            <input type="number" class="form-control" id="settings-port" value="{{.Port}}" readonly>
+            <div class="form-text">Requires restart to change</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Path Settings -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Paths & Commands</h3>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Endpoints Path</label>
+            <input type="text" class="form-control" id="settings-endpoints-path" value="{{.EndpointsPath}}" placeholder="/home/user/syncbot/endpoints">
+          </div>
+          <div class="col-md-6 mb-3">
+            <label class="form-label">Active Symlink Path</label>
+            <input type="text" class="form-control" id="settings-active-symlink" value="{{.ActiveSymlink}}" placeholder="/home/user/syncbot/active">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-12 mb-3">
+            <label class="form-label">Post-Activation Command</label>
+            <input type="text" class="form-control" id="settings-post-command" value="{{.PostActivationCommand}}" placeholder="sudo systemctl restart myservice">
+            <div class="form-text">Shell command to run after activating an endpoint (leave empty for none)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Actions -->
+<div class="row">
+  <div class="col-12">
+    <div class="d-flex gap-2">
+      <button type="button" class="btn btn-primary" onclick="saveSettings()">Save Settings</button>
+      <button type="button" class="btn btn-secondary" onclick="resetForm()">Reset</button>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "view-js"}}
+async function saveSettings() {
+  const settings = {
+    device_name: document.getElementById('settings-device-name').value,
+    device_description: document.getElementById('settings-device-description').value,
+    device_location: document.getElementById('settings-device-location').value,
+    device_ip: document.getElementById('settings-device-ip').value,
+    ssh_username: document.getElementById('settings-ssh-username').value,
+    endpoints_path: document.getElementById('settings-endpoints-path').value,
+    active_symlink: document.getElementById('settings-active-symlink').value,
+    post_activation_command: document.getElementById('settings-post-command').value
+  };
+
+  try {
+    const response = await fetch('/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      showToast('Error', data.error, 'danger');
+      return;
+    }
+
+    const data = await response.json();
+    // Update global variables
+    deviceName = data.device_name;
+    deviceDescription = data.device_description;
+    deviceLocation = data.device_location;
+    deviceIP = data.device_ip;
+    sshUsername = data.ssh_username;
+    endpointsPath = data.endpoints_path;
+    activeSymlink = data.active_symlink;
+
+    showToast('Success', 'Settings saved successfully', 'success');
+  } catch (error) {
+    showToast('Error', 'Failed to save settings', 'danger');
+  }
+}
+
+function resetForm() {
+  // Reload page to reset form to server values
+  window.location.reload();
+}
+{{end}}
+
+{{define "page-actions"}}
+<a href="/sync" class="btn btn-outline-primary">
+  <i class="ti ti-refresh"></i>
+  Sync from Master
+</a>
+{{end}}

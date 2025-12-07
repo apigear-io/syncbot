@@ -1,0 +1,634 @@
+{{define "content"}}
+<!-- PIN Section -->
+<div id="auth-section">
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">
+            <i class="ti ti-terminal-2 me-2"></i>
+            Terminal Access
+          </h3>
+        </div>
+        <div class="card-body">
+          <!-- Setup PIN (shown when no PIN exists) -->
+          <div id="setup-section" class="d-none">
+            <p class="text-muted mb-3">Set a 4-digit PIN for terminal access.</p>
+            <form id="setup-form" onsubmit="handleSetup(event)">
+              <div class="mb-3">
+                <label class="form-label">Create PIN</label>
+                <input type="password" class="form-control text-center" id="setup-pin"
+                       pattern="[0-9]{4}" maxlength="4" inputmode="numeric" required
+                       placeholder="****" style="letter-spacing: 0.3em;">
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Confirm PIN</label>
+                <input type="password" class="form-control text-center" id="setup-pin-confirm"
+                       pattern="[0-9]{4}" maxlength="4" inputmode="numeric" required
+                       placeholder="****" style="letter-spacing: 0.3em;">
+              </div>
+              <div class="mb-3">
+                <label class="form-check">
+                  <input type="checkbox" class="form-check-input" id="setup-remember">
+                  <span class="form-check-label">Remember PIN</span>
+                </label>
+              </div>
+              <div id="setup-error" class="alert alert-danger d-none"></div>
+              <button type="submit" class="btn btn-primary w-100">Set PIN</button>
+            </form>
+          </div>
+
+          <!-- Enter PIN (shown when PIN exists but not remembered) -->
+          <div id="login-section" class="d-none">
+            <p class="text-muted mb-3">Enter your 4-digit PIN.</p>
+            <form id="login-form" onsubmit="handleLogin(event)">
+              <div class="mb-3">
+                <input type="password" class="form-control text-center" id="login-pin"
+                       pattern="[0-9]{4}" maxlength="4" inputmode="numeric" required autofocus
+                       placeholder="****" style="letter-spacing: 0.3em;">
+              </div>
+              <div class="mb-3">
+                <label class="form-check">
+                  <input type="checkbox" class="form-check-input" id="login-remember">
+                  <span class="form-check-label">Remember PIN</span>
+                </label>
+              </div>
+              <div id="login-error" class="alert alert-danger d-none"></div>
+              <button type="submit" class="btn btn-primary w-100" id="login-btn">
+                <span id="login-spinner" class="spinner-border spinner-border-sm d-none me-2"></span>
+                Enter
+              </button>
+              <button type="button" class="btn btn-link w-100 mt-2 text-muted" onclick="resetPIN()">
+                Reset PIN
+              </button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Loading Section -->
+<div id="loading-section" class="d-none">
+  <div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+      <div class="card">
+        <div class="card-body text-center py-5">
+          <div class="spinner-border text-primary mb-3" role="status"></div>
+          <p class="text-muted mb-0">Loading terminal...</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Terminal Section -->
+<div id="terminal-section" class="d-none">
+  <div class="card">
+    <div class="card-header">
+      <h3 class="card-title d-flex align-items-center">
+        <i class="ti ti-terminal-2 me-2"></i>
+        {{.DeviceName}}
+        <i class="ti ti-loader ms-2" id="session-status-icon" title="Connecting..."></i>
+        <span class="text-muted small ms-2" id="session-timer"></span>
+      </h3>
+      <div class="card-actions d-flex align-items-center">
+        <div class="dropdown me-2">
+          <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" id="commands-dropdown-btn">
+            <i class="ti ti-player-play"></i>
+            Commands
+          </button>
+          <div class="dropdown-menu dropdown-menu-end" style="min-width: 250px;">
+            {{if .Commands}}
+              {{range .Commands}}
+              <a class="dropdown-item font-monospace small" href="#" onclick="runCommand('{{.Command}}'); return false;" title="{{.Description}}">
+                {{.Command}}
+              </a>
+              {{end}}
+            {{else}}
+              <div class="px-3 py-2 text-muted small">No commands configured</div>
+            {{end}}
+          </div>
+        </div>
+        <button class="btn btn-sm btn-outline-danger" onclick="disconnectTerminal()">Disconnect</button>
+      </div>
+    </div>
+    <div class="card-body p-0">
+      <div id="terminal-container" style="height: calc(100vh - 280px); min-height: 400px;"></div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "view-js"}}
+// xterm.js CSS and JS are loaded from CDN
+const XTERM_CSS = 'https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css';
+const XTERM_JS = 'https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js';
+const XTERM_FIT = 'https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js';
+const XTERM_WEBLINKS = 'https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.min.js';
+
+function runCommand(cmd) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) {
+    showToast('Error', 'Terminal not connected', 'danger');
+    return;
+  }
+  // Send the command followed by Enter
+  socket.send(new TextEncoder().encode(cmd + '\n'));
+  terminal.focus();
+}
+
+// Storage keys
+const STORAGE_PIN = 'syncbot-terminal-pin';
+const STORAGE_SESSION_TOKEN = 'syncbot-terminal-token';
+
+let terminal = null;
+let fitAddon = null;
+let socket = null;
+let sessionToken = null;
+let idleTimer = null;
+let sessionStartTime = null;
+let timerInterval = null;
+
+const IDLE_TIMEOUT = 15 * 60 * 1000; // 15 minutes
+const IDLE_WARNING = 2 * 60 * 1000;  // 2 minutes warning
+
+// Load xterm.js dynamically
+async function loadXterm() {
+  if (!document.querySelector('link[href*="xterm"]')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = XTERM_CSS;
+    document.head.appendChild(link);
+  }
+
+  await loadScript(XTERM_JS);
+  await loadScript(XTERM_FIT);
+  await loadScript(XTERM_WEBLINKS);
+}
+
+function loadScript(src) {
+  return new Promise((resolve, reject) => {
+    if (document.querySelector(`script[src="${src}"]`)) {
+      resolve();
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
+// Check for existing session
+async function checkExistingSession() {
+  const savedToken = sessionStorage.getItem(STORAGE_SESSION_TOKEN);
+  if (!savedToken) return false;
+
+  try {
+    const response = await fetch('/api/terminal/session?token=' + encodeURIComponent(savedToken));
+    const data = await response.json();
+
+    if (data.valid) {
+      sessionToken = savedToken;
+      return true;
+    }
+  } catch (e) {
+    console.error('Session check failed:', e);
+  }
+
+  // Session invalid or check failed - clear it
+  sessionStorage.removeItem(STORAGE_SESSION_TOKEN);
+  sessionToken = null;
+  return false;
+}
+
+// Get stored PIN
+function getStoredPIN() {
+  return localStorage.getItem(STORAGE_PIN);
+}
+
+// Show appropriate auth section
+function showAuthSection() {
+  const storedPIN = getStoredPIN();
+
+  document.getElementById('auth-section').classList.remove('d-none');
+  document.getElementById('terminal-section').classList.add('d-none');
+
+  if (!storedPIN) {
+    // No PIN set - show setup
+    document.getElementById('setup-section').classList.remove('d-none');
+    document.getElementById('login-section').classList.add('d-none');
+  } else {
+    // Has PIN - show login
+    document.getElementById('setup-section').classList.add('d-none');
+    document.getElementById('login-section').classList.remove('d-none');
+  }
+}
+
+// Validate PIN format
+function isValidPIN(pin) {
+  return /^[0-9]{4}$/.test(pin);
+}
+
+// Handle setup form
+async function handleSetup(e) {
+  e.preventDefault();
+
+  const pin = document.getElementById('setup-pin').value;
+  const confirmPIN = document.getElementById('setup-pin-confirm').value;
+  const remember = document.getElementById('setup-remember').checked;
+  const errorDiv = document.getElementById('setup-error');
+
+  errorDiv.classList.add('d-none');
+
+  if (!isValidPIN(pin)) {
+    errorDiv.textContent = 'PIN must be exactly 4 digits';
+    errorDiv.classList.remove('d-none');
+    return;
+  }
+
+  if (pin !== confirmPIN) {
+    errorDiv.textContent = 'PINs do not match';
+    errorDiv.classList.remove('d-none');
+    return;
+  }
+
+  // Store PIN
+  localStorage.setItem(STORAGE_PIN, pin);
+
+  // If not remembering, we'll clear it after auth
+  try {
+    await authenticate(pin);
+    if (!remember) {
+      localStorage.removeItem(STORAGE_PIN);
+    }
+  } catch (error) {
+    errorDiv.textContent = error.message;
+    errorDiv.classList.remove('d-none');
+  }
+}
+
+// Handle login form
+async function handleLogin(e) {
+  e.preventDefault();
+
+  const pin = document.getElementById('login-pin').value;
+  const storedPIN = getStoredPIN();
+  const remember = document.getElementById('login-remember').checked;
+  const errorDiv = document.getElementById('login-error');
+  const spinner = document.getElementById('login-spinner');
+  const btn = document.getElementById('login-btn');
+
+  errorDiv.classList.add('d-none');
+
+  if (!isValidPIN(pin)) {
+    errorDiv.textContent = 'PIN must be exactly 4 digits';
+    errorDiv.classList.remove('d-none');
+    return;
+  }
+
+  if (pin !== storedPIN) {
+    errorDiv.textContent = 'Incorrect PIN';
+    errorDiv.classList.remove('d-none');
+    document.getElementById('login-pin').value = '';
+    document.getElementById('login-pin').focus();
+    return;
+  }
+
+  spinner.classList.remove('d-none');
+  btn.disabled = true;
+
+  try {
+    await authenticate(pin);
+    document.getElementById('login-pin').value = '';
+
+    // Update remember preference
+    if (!remember) {
+      localStorage.removeItem(STORAGE_PIN);
+    }
+  } catch (error) {
+    errorDiv.textContent = error.message;
+    errorDiv.classList.remove('d-none');
+  } finally {
+    spinner.classList.add('d-none');
+    btn.disabled = false;
+  }
+}
+
+// Authenticate with server
+async function authenticate(pin) {
+  const response = await fetch('/api/terminal/auth', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username: 'user', passwordHash: pin })
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Authentication failed');
+  }
+
+  sessionToken = data.token;
+  sessionStorage.setItem(STORAGE_SESSION_TOKEN, sessionToken);
+
+  await connectTerminal();
+}
+
+// Reset PIN
+function resetPIN() {
+  if (!confirm('This will clear your PIN. Continue?')) {
+    return;
+  }
+
+  localStorage.removeItem(STORAGE_PIN);
+  sessionStorage.removeItem(STORAGE_SESSION_TOKEN);
+  showAuthSection();
+}
+
+// Show loading section
+function showLoading() {
+  document.getElementById('auth-section').classList.add('d-none');
+  document.getElementById('loading-section').classList.remove('d-none');
+  document.getElementById('terminal-section').classList.add('d-none');
+}
+
+// Hide loading section
+function hideLoading() {
+  document.getElementById('loading-section').classList.add('d-none');
+}
+
+// Connect to terminal WebSocket
+async function connectTerminal() {
+  showLoading();
+
+  await loadXterm();
+
+  hideLoading();
+  document.getElementById('terminal-section').classList.remove('d-none');
+
+  updateStatus('connecting', 'Connecting...');
+
+  terminal = new Terminal({
+    cursorBlink: true,
+    fontSize: 14,
+    fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+    theme: {
+      background: '#1e1e1e',
+      foreground: '#d4d4d4',
+      cursor: '#f8f8f2',
+      cursorAccent: '#1e1e1e',
+      selection: 'rgba(255, 255, 255, 0.3)',
+      // Standard ANSI colors
+      black: '#21222c',
+      red: '#ff5555',
+      green: '#50fa7b',
+      yellow: '#f1fa8c',
+      blue: '#6272a4',
+      magenta: '#ff79c6',
+      cyan: '#8be9fd',
+      white: '#f8f8f2',
+      // Bright colors
+      brightBlack: '#6272a4',
+      brightRed: '#ff6e6e',
+      brightGreen: '#69ff94',
+      brightYellow: '#ffffa5',
+      brightBlue: '#d6acff',
+      brightMagenta: '#ff92df',
+      brightCyan: '#a4ffff',
+      brightWhite: '#ffffff'
+    }
+  });
+
+  fitAddon = new FitAddon.FitAddon();
+  terminal.loadAddon(fitAddon);
+  terminal.loadAddon(new WebLinksAddon.WebLinksAddon());
+
+  const container = document.getElementById('terminal-container');
+  terminal.open(container);
+  fitAddon.fit();
+
+  const cols = terminal.cols;
+  const rows = terminal.rows;
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${protocol}//${window.location.host}/api/terminal/ws?token=${encodeURIComponent(sessionToken)}&cols=${cols}&rows=${rows}`;
+
+  socket = new WebSocket(wsUrl);
+  socket.binaryType = 'arraybuffer';
+
+  socket.onopen = () => {
+    updateStatus('connected', 'Connected');
+    terminal.focus();
+    startIdleTimer();
+    startSessionTimer();
+  };
+
+  socket.onmessage = (event) => {
+    resetIdleTimer();
+    if (event.data instanceof ArrayBuffer) {
+      terminal.write(new Uint8Array(event.data));
+    } else if (typeof event.data === 'string') {
+      // Try to parse as JSON (control message)
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'session_info') {
+          if (msg.reconnected) {
+            showToast(null, 'Session restored', 'info');
+          }
+          return;
+        }
+      } catch (e) {
+        // Not JSON, treat as terminal data
+      }
+      terminal.write(event.data);
+    }
+  };
+
+  socket.onclose = (event) => {
+    updateStatus('disconnected', 'Disconnected');
+    if (event.code !== 1000) {
+      terminal.write('\r\n\x1b[31mConnection closed\x1b[0m\r\n');
+    }
+    stopIdleTimer();
+    stopSessionTimer();
+    socket = null;
+  };
+
+  socket.onerror = (error) => {
+    console.error('WebSocket error:', error);
+    updateStatus('error', 'Error');
+    if (terminal) {
+      terminal.write('\r\n\x1b[31mConnection error\x1b[0m\r\n');
+    }
+  };
+
+  terminal.onData((data) => {
+    resetIdleTimer();
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(new TextEncoder().encode(data));
+    }
+  });
+
+  window.addEventListener('resize', handleResize);
+  setTimeout(() => fitAddon.fit(), 100);
+}
+
+function handleResize() {
+  if (fitAddon && terminal) {
+    fitAddon.fit();
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      const msg = JSON.stringify({
+        type: 'resize',
+        payload: { cols: terminal.cols, rows: terminal.rows }
+      });
+      socket.send(msg);
+    }
+  }
+}
+
+function updateStatus(state, text) {
+  const icon = document.getElementById('session-status-icon');
+  icon.title = text;
+
+  switch (state) {
+    case 'connected':
+      icon.className = 'ti ti-plug-connected ms-2 text-green';
+      break;
+    case 'connecting':
+      icon.className = 'ti ti-loader ms-2 text-yellow';
+      break;
+    case 'disconnected':
+    case 'error':
+      icon.className = 'ti ti-plug-connected-x ms-2 text-red';
+      break;
+  }
+}
+
+function startIdleTimer() {
+  resetIdleTimer();
+}
+
+function resetIdleTimer() {
+  if (idleTimer) clearTimeout(idleTimer);
+
+  idleTimer = setTimeout(() => {
+    showToast('Session Warning', 'Session will expire in 2 minutes due to inactivity', 'warning');
+
+    idleTimer = setTimeout(() => {
+      showToast('Session Expired', 'Session timed out due to inactivity', 'danger');
+      disconnectTerminal();
+    }, IDLE_WARNING);
+
+  }, IDLE_TIMEOUT - IDLE_WARNING);
+}
+
+function stopIdleTimer() {
+  if (idleTimer) {
+    clearTimeout(idleTimer);
+    idleTimer = null;
+  }
+}
+
+function startSessionTimer() {
+  sessionStartTime = Date.now();
+  timerInterval = setInterval(updateSessionTimer, 1000);
+  updateSessionTimer();
+}
+
+function updateSessionTimer() {
+  if (!sessionStartTime) return;
+
+  const elapsed = Math.floor((Date.now() - sessionStartTime) / 1000);
+  const minutes = Math.floor(elapsed / 60);
+  const seconds = elapsed % 60;
+
+  const timerEl = document.getElementById('session-timer');
+  if (timerEl) {
+    timerEl.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+}
+
+function stopSessionTimer() {
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+  sessionStartTime = null;
+}
+
+function disconnectTerminal() {
+  stopIdleTimer();
+  stopSessionTimer();
+
+  if (socket) {
+    socket.close();
+    socket = null;
+  }
+
+  if (terminal) {
+    terminal.dispose();
+    terminal = null;
+  }
+
+  window.removeEventListener('resize', handleResize);
+
+  if (sessionToken) {
+    fetch('/api/terminal/logout', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + sessionToken }
+    }).catch(() => {});
+  }
+
+  sessionToken = null;
+  sessionStorage.removeItem(STORAGE_SESSION_TOKEN);
+
+  showAuthSection();
+}
+
+// Initialize
+(async function init() {
+  // Check for existing valid session first
+  if (await checkExistingSession()) {
+    try {
+      await connectTerminal();
+      return;
+    } catch (e) {
+      console.error('Reconnect failed:', e);
+      // Clear stale session and continue to auth
+      sessionStorage.removeItem(STORAGE_SESSION_TOKEN);
+      sessionToken = null;
+    }
+  }
+
+  // Check if we have a stored PIN (remembered)
+  const storedPIN = getStoredPIN();
+  if (storedPIN) {
+    // Auto-login with stored PIN
+    try {
+      await authenticate(storedPIN);
+      return;
+    } catch (e) {
+      console.error('Auto-login failed:', e);
+    }
+  }
+
+  showAuthSection();
+})();
+
+// Clean up on page unload
+window.addEventListener('beforeunload', () => {
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.close(1000, 'Page unload');
+  }
+});
+{{end}}
+
+{{define "page-actions"}}
+<a href="/commands" class="btn btn-outline-secondary">
+  <i class="ti ti-command"></i>
+  Manage Commands
+</a>
+{{end}}

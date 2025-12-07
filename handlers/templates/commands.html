@@ -1,0 +1,340 @@
+{{define "content"}}
+<!-- Template Variables Info -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Template Variables</h3>
+        <div class="card-actions">
+          <a class="btn btn-sm" data-bs-toggle="collapse" href="#vars-collapse">Show/Hide</a>
+        </div>
+      </div>
+      <div class="collapse" id="vars-collapse">
+        <div class="card-body">
+          <p class="text-muted mb-3">Commands support Go template syntax. Use these variables in your commands:</p>
+          <div class="table-responsive">
+            <table class="table table-sm">
+              <thead>
+                <tr>
+                  <th>Variable</th>
+                  <th>Current Value</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>{{"{{"}}.HomeDir{{"}}"}}</code></td>
+                  <td><code class="text-muted">{{.TemplateVars.HomeDir}}</code></td>
+                  <td class="text-muted">User home directory</td>
+                </tr>
+                <tr>
+                  <td><code>{{"{{"}}.EndpointsPath{{"}}"}}</code></td>
+                  <td><code class="text-muted">{{.TemplateVars.EndpointsPath}}</code></td>
+                  <td class="text-muted">Path to endpoints directory</td>
+                </tr>
+                <tr>
+                  <td><code>{{"{{"}}.ActiveSymlink{{"}}"}}</code></td>
+                  <td><code class="text-muted">{{.TemplateVars.ActiveSymlink}}</code></td>
+                  <td class="text-muted">Path to active symlink</td>
+                </tr>
+                <tr>
+                  <td><code>{{"{{"}}.ActiveName{{"}}"}}</code></td>
+                  <td><code class="text-muted">{{if .TemplateVars.ActiveName}}{{.TemplateVars.ActiveName}}{{else}}(none){{end}}</code></td>
+                  <td class="text-muted">Name of active endpoint</td>
+                </tr>
+                <tr>
+                  <td><code>{{"{{"}}.DeviceName{{"}}"}}</code></td>
+                  <td><code class="text-muted">{{.TemplateVars.DeviceName}}</code></td>
+                  <td class="text-muted">Device name</td>
+                </tr>
+                <tr>
+                  <td><code>{{"{{"}}.DeviceIP{{"}}"}}</code></td>
+                  <td><code class="text-muted">{{.TemplateVars.DeviceIP}}</code></td>
+                  <td class="text-muted">Device IP address</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="alert alert-info mt-3 mb-0">
+            <strong>Example:</strong> <code>ls -la {{"{{"}}.EndpointsPath{{"}}"}}/{{"{{"}}.ActiveName{{"}}"}}</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Commands List -->
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Commands</h3>
+        <div class="card-actions">
+          <span class="text-muted">{{len .Commands}} command{{if ne (len .Commands) 1}}s{{end}}</span>
+        </div>
+      </div>
+      <div class="card-body p-0" id="commands-container">
+        {{if .Commands}}
+        <div class="list-group list-group-flush">
+          {{range .Commands}}
+          <div class="list-group-item" data-command-id="{{.ID}}">
+            <div class="row align-items-center">
+              <div class="col-auto">
+                <button class="btn btn-success btn-icon" onclick="executeCommand('{{.ID}}', '{{.Name}}')" title="Run command">
+                  <i class="ti ti-player-play"></i>
+                </button>
+              </div>
+              <div class="col">
+                <div class="d-flex align-items-center">
+                  <strong>{{.Name}}</strong>
+                  <code class="ms-2 text-muted small">{{.ID}}</code>
+                </div>
+                {{if .Description}}<div class="text-muted small">{{.Description}}</div>{{end}}
+                <code class="small text-secondary d-block mt-1" style="word-break: break-all;">{{.Command}}</code>
+              </div>
+              <div class="col-auto">
+                <div class="btn-group">
+                  <button class="btn btn-sm btn-outline-secondary" onclick="editCommand('{{.ID}}')" title="Edit">
+                    <i class="ti ti-edit"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger" onclick="confirmDelete('{{.ID}}', '{{.Name}}')" title="Delete">
+                    <i class="ti ti-trash"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          {{end}}
+        </div>
+        {{else}}
+        <div class="p-4 text-center">
+          <div class="text-muted mb-3">No commands configured yet</div>
+          <button class="btn btn-primary" data-bs-toggle="offcanvas" data-bs-target="#command-drawer">
+            Add Your First Command
+          </button>
+        </div>
+        {{end}}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Execute Command Modal -->
+<div class="modal fade" id="executeModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Execute: <span id="exec-cmd-name"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="exec-status" class="mb-3">
+          <div class="spinner-border spinner-border-sm text-primary me-2"></div>
+          Executing command...
+        </div>
+        <div>
+          <label class="form-label">Output</label>
+          <pre id="exec-output" class="bg-dark text-light p-3 rounded" style="max-height: 400px; overflow-y: auto; white-space: pre-wrap; min-height: 100px;"></pre>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Delete Command</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete <strong id="delete-cmd-name"></strong>?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "view-js"}}
+// Commands data from server
+const commands = [
+  {{range $i, $cmd := .Commands}}{{if $i}},{{end}}
+  {id: "{{$cmd.ID}}", name: "{{$cmd.Name}}", description: "{{$cmd.Description}}", command: "{{$cmd.Command}}"}
+  {{end}}
+];
+
+let executeModal = null;
+let deleteModal = null;
+let pendingDeleteId = null;
+
+// Generate ID from name (e.g., "Restart Service" -> "restart-service")
+function generateIdFromName(name) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+// Open drawer for adding new command
+function openAddCommandDrawer() {
+  document.getElementById('command-drawer-title').textContent = 'Add Command';
+  document.getElementById('cmd-edit-mode').value = '';
+  document.getElementById('cmd-id').value = '';
+  document.getElementById('cmd-name').value = '';
+  document.getElementById('cmd-description').value = '';
+  document.getElementById('cmd-command').value = '';
+
+  const drawer = bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('command-drawer'));
+  drawer.show();
+}
+
+// Open drawer for editing command
+function editCommand(id) {
+  const cmd = commands.find(c => c.id === id);
+  if (!cmd) return;
+
+  document.getElementById('command-drawer-title').textContent = 'Edit Command';
+  document.getElementById('cmd-edit-mode').value = cmd.id;
+  document.getElementById('cmd-id').value = cmd.id;
+  document.getElementById('cmd-name').value = cmd.name;
+  document.getElementById('cmd-description').value = cmd.description || '';
+  document.getElementById('cmd-command').value = cmd.command;
+
+  const drawer = bootstrap.Offcanvas.getOrCreateInstance(document.getElementById('command-drawer'));
+  drawer.show();
+}
+
+// Save command (create or update)
+async function saveCommand() {
+  const editMode = document.getElementById('cmd-edit-mode').value;
+  const isEdit = editMode !== '';
+
+  const name = document.getElementById('cmd-name').value.trim();
+  const command = {
+    id: isEdit ? document.getElementById('cmd-id').value : generateIdFromName(name),
+    name: name,
+    description: document.getElementById('cmd-description').value.trim(),
+    command: document.getElementById('cmd-command').value.trim()
+  };
+
+  if (!command.name || !command.command) {
+    showToast('Error', 'Name and Command are required', 'danger');
+    return;
+  }
+
+  if (!command.id) {
+    showToast('Error', 'Name must contain at least one alphanumeric character', 'danger');
+    return;
+  }
+
+  try {
+    const url = isEdit ? `/api/commands/${editMode}` : '/api/commands';
+    const method = isEdit ? 'PUT' : 'POST';
+
+    const response = await fetch(url, {
+      method: method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(command)
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      showToast('Error', data.error, 'danger');
+      return;
+    }
+
+    const drawer = bootstrap.Offcanvas.getInstance(document.getElementById('command-drawer'));
+    drawer.hide();
+
+    showToast('Success', isEdit ? 'Command updated' : 'Command created', 'success');
+    window.location.reload();
+  } catch (error) {
+    showToast('Error', 'Failed to save command', 'danger');
+  }
+}
+
+// Delete command
+function confirmDelete(id, name) {
+  pendingDeleteId = id;
+  document.getElementById('delete-cmd-name').textContent = name;
+
+  if (!deleteModal) {
+    deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+  }
+  deleteModal.show();
+}
+
+async function deleteCommand() {
+  if (!pendingDeleteId) return;
+
+  try {
+    const response = await fetch(`/api/commands/${pendingDeleteId}`, { method: 'DELETE' });
+
+    if (!response.ok) {
+      const data = await response.json();
+      showToast('Error', data.error, 'danger');
+      return;
+    }
+
+    deleteModal.hide();
+    showToast('Success', 'Command deleted', 'success');
+    window.location.reload();
+  } catch (error) {
+    showToast('Error', 'Failed to delete command', 'danger');
+  }
+
+  pendingDeleteId = null;
+}
+
+// Execute command
+async function executeCommand(id, name) {
+  document.getElementById('exec-cmd-name').textContent = name;
+  document.getElementById('exec-status').innerHTML =
+    '<div class="spinner-border spinner-border-sm text-primary me-2"></div> Executing command...';
+  document.getElementById('exec-output').textContent = '';
+
+  if (!executeModal) {
+    executeModal = new bootstrap.Modal(document.getElementById('executeModal'));
+  }
+  executeModal.show();
+
+  try {
+    const response = await fetch(`/api/commands/${id}/execute`, { method: 'POST' });
+    const result = await response.json();
+
+    if (result.success) {
+      document.getElementById('exec-status').innerHTML =
+        '<span class="badge bg-success">Success</span>';
+    } else {
+      document.getElementById('exec-status').innerHTML =
+        `<span class="badge bg-danger">Failed</span> <span class="text-danger ms-2">${escapeHtml(result.error || '')}</span>`;
+    }
+
+    document.getElementById('exec-output').textContent = result.output || '(no output)';
+  } catch (error) {
+    document.getElementById('exec-status').innerHTML = '<span class="badge bg-danger">Error</span>';
+    document.getElementById('exec-output').textContent = 'Failed to execute command: ' + error.message;
+  }
+}
+
+// Setup delete button handler
+document.getElementById('confirm-delete-btn').addEventListener('click', deleteCommand);
+{{end}}
+
+{{define "page-actions"}}
+<button class="btn btn-primary" data-bs-toggle="offcanvas" data-bs-target="#command-drawer">
+  <i class="ti ti-plus"></i>
+  Add Command
+</button>
+{{end}}

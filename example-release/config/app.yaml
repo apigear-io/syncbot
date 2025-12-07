@@ -1,0 +1,16 @@
+app:
+  name: example-app
+  version: 1.0.0
+  debug: false
+
+server:
+  host: 0.0.0.0
+  port: 8080
+
+database:
+  driver: sqlite
+  path: /var/data/app.db
+
+logging:
+  level: info
+  format: json

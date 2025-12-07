@@ -1,0 +1,145 @@
+{{define "drawers"}}
+<!-- Help Drawer (context-specific) -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="help-drawer" style="width: 500px;" data-bs-theme="light">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title text-dark">Help</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body text-dark">
+    {{template "view-help" .}}
+  </div>
+</div>
+
+<!-- Add Device Drawer -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="add-device-drawer" data-bs-theme="light">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title">Add Device</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body">
+    <ul class="nav nav-tabs mb-3" role="tablist">
+      <li class="nav-item" role="presentation">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#add-device-single" type="button">Single</button>
+      </li>
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-target="#add-device-csv" type="button">CSV Import</button>
+      </li>
+    </ul>
+    <div class="tab-content">
+      <div class="tab-pane fade show active" id="add-device-single" role="tabpanel">
+        <form id="add-device-form">
+          <div class="mb-3">
+            <label class="form-label">Device Name</label>
+            <input type="text" class="form-control" id="new-device-name" placeholder="test-device-02" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">URL</label>
+            <input type="url" class="form-control" id="new-device-url" placeholder="http://192.168.1.101:8081" required>
+            <div class="form-text">Full URL to the SyncBot instance</div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <input type="text" class="form-control" id="new-device-description" placeholder="Secondary test device">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Location</label>
+            <input type="text" class="form-control" id="new-device-location" placeholder="Room 102">
+          </div>
+          <div class="d-grid gap-2">
+            <button type="submit" class="btn btn-primary">Add Device</button>
+          </div>
+        </form>
+      </div>
+      <div class="tab-pane fade" id="add-device-csv" role="tabpanel">
+        <div class="mb-3">
+          <label class="form-label">CSV Data</label>
+          <textarea class="form-control font-monospace" id="csv-import-data" rows="8" placeholder="name,url,description,location
+device-01,http://192.168.1.100:8081,Primary device,Room 101
+device-02,http://192.168.1.101:8081,Secondary device,Room 102"></textarea>
+          <div class="form-text">Format: name,url,description,location (one device per line, first line can be header)</div>
+        </div>
+        <div class="mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="csv-replace-all">
+            <label class="form-check-label" for="csv-replace-all">Replace all existing devices</label>
+          </div>
+        </div>
+        <div class="d-grid gap-2">
+          <button type="button" class="btn btn-primary" onclick="importDevicesFromCSV()">Import Devices</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Create Endpoint Drawer -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="create-drawer" data-bs-theme="light">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title">Create New Endpoint</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body">
+    <form id="create-form">
+      <div class="mb-3">
+        <label class="form-label">Endpoint Name</label>
+        <input type="text" class="form-control" id="endpoint-name" placeholder="my-release" required pattern="[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]|[a-zA-Z0-9]">
+        <div class="form-text">Alphanumeric and hyphens only</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Owner</label>
+        <input type="text" class="form-control" id="owner" placeholder="john" required>
+        <div class="form-text">Your name (contact for this endpoint)</div>
+      </div>
+      <div class="d-grid gap-2">
+        <button type="submit" class="btn btn-primary">Create Endpoint</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="offcanvas">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Command Drawer -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="command-drawer" style="width: 500px;" data-bs-theme="light">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title" id="command-drawer-title">Add Command</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body">
+    <input type="hidden" id="cmd-edit-mode" value="">
+    <input type="hidden" id="cmd-id" value="">
+    <form id="command-form" onsubmit="event.preventDefault(); saveCommand();">
+      <div class="mb-3">
+        <label class="form-label">Name</label>
+        <input type="text" class="form-control" id="cmd-name" placeholder="Restart Service" required>
+        <div class="form-text">Display name for this command</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <input type="text" class="form-control" id="cmd-description" placeholder="Restarts the application service">
+        <div class="form-text">Optional description</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Shell Command</label>
+        <textarea class="form-control font-monospace" id="cmd-command" rows="4" placeholder="sudo systemctl restart myapp" required></textarea>
+        <div class="form-text">
+          Supports Go template variables:
+          <code>{{"{{"}}.HomeDir{{"}}"}}</code>,
+          <code>{{"{{"}}.EndpointsPath{{"}}"}}</code>,
+          <code>{{"{{"}}.ActiveSymlink{{"}}"}}</code>,
+          <code>{{"{{"}}.ActiveName{{"}}"}}</code>,
+          <code>{{"{{"}}.DeviceName{{"}}"}}</code>,
+          <code>{{"{{"}}.DeviceIP{{"}}"}}</code>
+        </div>
+      </div>
+      <div class="alert alert-info">
+        <strong>Example:</strong><br>
+        <code>echo "Active: {{"{{"}}.ActiveName{{"}}"}}" && ls -la {{"{{"}}.ActiveSymlink{{"}}"}}</code>
+      </div>
+      <div class="d-grid gap-2">
+        <button type="submit" class="btn btn-primary">Save Command</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="offcanvas">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}

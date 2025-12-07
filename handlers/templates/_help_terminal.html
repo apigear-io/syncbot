@@ -1,0 +1,28 @@
+{{define "view-help"}}
+<h5>Terminal</h5>
+<p>Access an interactive shell on this device through your browser.</p>
+
+<h6>PIN Access</h6>
+<p>Terminal access is protected by a 4-digit PIN stored in your browser.</p>
+<ul>
+  <li><strong>Setup</strong>: First-time users create a PIN</li>
+  <li><strong>Remember PIN</strong>: Optionally store for auto-login</li>
+  <li><strong>Reset</strong>: Click "Reset PIN" to clear and set a new one</li>
+</ul>
+
+<h6>Session Timeout</h6>
+<p>Sessions automatically expire after <strong>15 minutes of inactivity</strong>. You'll receive a warning 2 minutes before timeout.</p>
+
+<h6>Configuration</h6>
+<p>The shell can be configured in <code>config.yaml</code>:</p>
+<pre><code>terminal:
+  shell: /bin/bash</code></pre>
+
+<h6>Keyboard Shortcuts</h6>
+<ul>
+  <li><kbd>Ctrl+C</kbd> - Interrupt current command</li>
+  <li><kbd>Ctrl+D</kbd> - End of input / logout</li>
+  <li><kbd>Ctrl+L</kbd> - Clear screen</li>
+  <li><kbd>Tab</kbd> - Auto-complete</li>
+</ul>
+{{end}}

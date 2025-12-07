@@ -1,0 +1,105 @@
+{{define "modals"}}
+<!-- rsync Modal -->
+<div class="modal modal-blur fade" id="rsync-modal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">rsync Command</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Run this command from your terminal to sync your software:</p>
+        <div class="mb-3">
+          <label class="form-label">Local Source Path</label>
+          <input type="text" class="form-control" id="local-path" placeholder="/path/to/your/release">
+          <div class="form-text">Windows: use Git Bash (<code>/c/...</code>), WSL (<code>/mnt/c/...</code>), or Cygwin paths</div>
+        </div>
+        <div class="input-group">
+          <input type="text" class="form-control font-monospace" id="rsync-command" readonly>
+          <button class="btn btn-primary" type="button" onclick="copyRsyncCommand()">Copy</button>
+        </div>
+        <div class="form-text mt-2">SSH Username: <code id="rsync-ssh-user"></code> | Device: <code id="rsync-device-ip"></code></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Activation Confirmation Modal -->
+<div class="modal modal-blur fade" id="activate-modal" tabindex="-1">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content" data-bs-theme="light">
+      <div class="modal-status bg-warning"></div>
+      <div class="modal-body text-center py-4">
+        <i class="ti ti-alert-triangle icon-lg text-warning mb-2"></i>
+        <h3 class="text-dark">Activate Endpoint</h3>
+        <p class="text-secondary">Activate <strong id="activate-endpoint-name"></strong>?</p>
+        <div class="text-start mt-3" id="activate-command-section">
+          <label class="form-label text-muted">Post-activation command:</label>
+          <pre class="bg-dark text-light p-2 rounded mb-0"><code id="activate-command-display"></code></pre>
+        </div>
+        <div id="activate-no-command" class="text-muted mt-2" style="display: none;">
+          <em>No post-activation command configured</em>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <div class="w-100">
+          <div class="row">
+            <div class="col">
+              <button type="button" class="btn w-100" data-bs-dismiss="modal">Cancel</button>
+            </div>
+            <div class="col">
+              <button type="button" class="btn btn-warning w-100" id="activate-confirm-btn">Activate</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Remove Device Confirmation Modal -->
+<div class="modal modal-blur fade" id="remove-device-modal" tabindex="-1">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content" data-bs-theme="light">
+      <div class="modal-status bg-danger"></div>
+      <div class="modal-body text-center py-4">
+        <i class="ti ti-trash icon-lg text-danger mb-2"></i>
+        <h3 class="text-dark">Remove Device</h3>
+        <p class="text-secondary">Remove <strong id="remove-device-name"></strong> from the registry?</p>
+      </div>
+      <div class="modal-footer">
+        <div class="w-100">
+          <div class="row">
+            <div class="col">
+              <button type="button" class="btn w-100" data-bs-dismiss="modal">Cancel</button>
+            </div>
+            <div class="col">
+              <button type="button" class="btn btn-danger w-100" id="remove-device-confirm-btn">Remove</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal modal-blur fade" id="delete-modal" tabindex="-1">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Delete Endpoint</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p>Enter your owner name to confirm deletion of <strong id="delete-endpoint-name"></strong>:</p>
+        <input type="text" class="form-control" id="delete-owner" placeholder="Your owner name">
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}

@@ -1,0 +1,6 @@
+# SyncBot deployment targets
+# One device per line: user@hostname
+
+amd@10.1.0.146
+amd@10.1.0.147
+# pi@raspberry.local

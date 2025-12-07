@@ -1,0 +1,60 @@
+{{define "view-help"}}
+<ul class="nav nav-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#help-tab-overview" type="button">Overview</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#help-tab-variables" type="button">Variables</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#help-tab-examples" type="button">Examples</button>
+  </li>
+</ul>
+<div class="tab-content mt-3">
+  <div class="tab-pane fade show active" id="help-tab-overview" role="tabpanel">
+    <h4>User Commands</h4>
+    <p>Define custom shell commands that can be executed on the device. Commands are useful for common operations like restarting services, clearing caches, or running diagnostics.</p>
+    <h5>Creating a Command</h5>
+    <p>Click <strong>Add Command</strong> and fill in:</p>
+    <ul>
+      <li><strong>Command ID:</strong> Unique identifier (lowercase, hyphens allowed)</li>
+      <li><strong>Name:</strong> Display name for the command</li>
+      <li><strong>Description:</strong> Optional explanation of what it does</li>
+      <li><strong>Shell Command:</strong> The actual command to run</li>
+    </ul>
+    <h5>Running Commands</h5>
+    <p>Click the <strong>Run</strong> button next to any command. The output (stdout and stderr) will be displayed in a modal dialog.</p>
+    <div class="alert alert-warning">
+      <strong>Note:</strong> Commands run with the same permissions as the SyncBot process. Be careful with commands that modify system state.
+    </div>
+  </div>
+  <div class="tab-pane fade" id="help-tab-variables" role="tabpanel">
+    <h4>Template Variables</h4>
+    <p>Commands support Go template syntax for dynamic values:</p>
+    <table class="table table-sm">
+      <tr><td><code>{{"{{"}}.HomeDir{{"}}"}}</code></td><td>User's home directory</td></tr>
+      <tr><td><code>{{"{{"}}.EndpointsPath{{"}}"}}</code></td><td>Path to endpoints directory</td></tr>
+      <tr><td><code>{{"{{"}}.ActiveSymlink{{"}}"}}</code></td><td>Path to active symlink</td></tr>
+      <tr><td><code>{{"{{"}}.ActiveName{{"}}"}}</code></td><td>Name of active endpoint</td></tr>
+      <tr><td><code>{{"{{"}}.DeviceName{{"}}"}}</code></td><td>Device name</td></tr>
+      <tr><td><code>{{"{{"}}.DeviceIP{{"}}"}}</code></td><td>Device IP address</td></tr>
+    </table>
+    <div class="alert alert-info">
+      <strong>Tip:</strong> Click "Show/Hide" on the Template Variables card to see current values.
+    </div>
+  </div>
+  <div class="tab-pane fade" id="help-tab-examples" role="tabpanel">
+    <h4>Example Commands</h4>
+    <h5>Restart a service</h5>
+    <pre class="bg-light p-2 rounded"><code>sudo systemctl restart myapp</code></pre>
+    <h5>List active endpoint contents</h5>
+    <pre class="bg-light p-2 rounded"><code>ls -la {{"{{"}}.ActiveSymlink{{"}}"}}</code></pre>
+    <h5>Show disk usage</h5>
+    <pre class="bg-light p-2 rounded"><code>df -h {{"{{"}}.EndpointsPath{{"}}"}}</code></pre>
+    <h5>Check active endpoint version</h5>
+    <pre class="bg-light p-2 rounded"><code>cat {{"{{"}}.ActiveSymlink{{"}}"}}/version.txt</code></pre>
+    <h5>Tail application logs</h5>
+    <pre class="bg-light p-2 rounded"><code>tail -n 50 /var/log/myapp.log</code></pre>
+  </div>
+</div>
+{{end}}

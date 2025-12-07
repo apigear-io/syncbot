@@ -1,0 +1,132 @@
+{{define "content"}}
+<!-- Device Info Bar -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card bg-light">
+      <div class="card-body py-2">
+        <div class="row text-muted small">
+          <div class="col-auto">
+            <strong>Device:</strong> <code>{{.DeviceIP}}</code>
+          </div>
+          <div class="col-auto">
+            <strong>SSH User:</strong> <code>{{.SSHUsername}}</code>
+          </div>
+          <div class="col-auto">
+            <strong>Endpoints:</strong> <code>{{.EndpointsPath}}</code>
+          </div>
+          <div class="col-auto">
+            <strong>Active Symlink:</strong> <code>{{.ActiveSymlink}}</code>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Active Endpoint Card -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card" id="active-card">
+      <div class="card-header">
+        <h3 class="card-title">Active Endpoint</h3>
+      </div>
+      <div class="card-body">
+        {{if .ActiveEndpoint}}
+        <div class="d-flex align-items-center">
+          <span class="badge bg-success me-2">Active</span>
+          <strong class="me-2">{{.ActiveEndpoint}}</strong>
+          {{range .Endpoints}}{{if .IsActive}}<span class="text-muted">owned by {{.Username}}</span>{{end}}{{end}}
+        </div>
+        {{else}}
+        <span class="text-muted">No active endpoint</span>
+        {{end}}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Endpoints Table -->
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header">
+        <h3 class="card-title">Endpoints</h3>
+        <div class="card-actions">
+          <button class="btn btn-primary" data-bs-toggle="offcanvas" data-bs-target="#create-drawer">
+            <i class="ti ti-plus"></i>
+            Create Endpoint
+          </button>
+        </div>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Owner</th>
+              <th>Created</th>
+              <th>Status</th>
+              <th class="w-1">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="endpoints-table">
+            {{if .Endpoints}}
+              {{range .Endpoints}}
+              <tr class="{{if .IsActive}}table-success{{end}}">
+                <td><strong>{{.Name}}</strong></td>
+                <td>{{.Username}}</td>
+                <td>{{.CreatedAt.Format "Jan 2, 2006 3:04 PM"}}</td>
+                <td>{{if .IsActive}}<span class="badge bg-success">Active</span>{{else}}-{{end}}</td>
+                <td>
+                  <div class="btn-group">
+                    {{if not .IsActive}}<button class="btn btn-sm btn-success" onclick="activateEndpoint('{{.Name}}')">Activate</button>{{end}}
+                    <button class="btn btn-sm btn-secondary" onclick="showRsyncModal('{{.Name}}')">rsync</button>
+                    {{if not .IsActive}}<button class="btn btn-sm btn-danger" onclick="showDeleteModal('{{.Name}}')">Delete</button>{{end}}
+                  </div>
+                </td>
+              </tr>
+              {{end}}
+            {{else}}
+              <tr>
+                <td colspan="5" class="text-center text-muted">No endpoints yet. Create one above!</td>
+              </tr>
+            {{end}}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "view-js"}}
+document.getElementById('create-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const name = document.getElementById('endpoint-name').value.trim();
+  const username = document.getElementById('owner').value.trim();
+
+  try {
+    const response = await fetch('/api/endpoints', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, username })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      showToast('Error', data.error, 'danger');
+      return;
+    }
+
+    showToast('Success', `Endpoint "${name}" created`, 'success');
+    bootstrap.Offcanvas.getInstance(document.getElementById('create-drawer')).hide();
+    window.location.reload();
+  } catch (error) {
+    showToast('Error', 'Failed to create endpoint', 'danger');
+  }
+});
+{{end}}
+
+{{define "page-actions"}}{{end}}
