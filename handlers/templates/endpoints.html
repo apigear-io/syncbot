@@ -51,12 +51,6 @@
     <div class="card">
       <div class="card-header">
         <h3 class="card-title">Endpoints</h3>
-        <div class="card-actions">
-          <button class="btn btn-primary" data-bs-toggle="offcanvas" data-bs-target="#create-drawer">
-            <i class="ti ti-plus"></i>
-            Create Endpoint
-          </button>
-        </div>
       </div>
       <div class="table-responsive">
         <table class="table table-vcenter card-table">
@@ -65,6 +59,7 @@
               <th>Name</th>
               <th>Owner</th>
               <th>Created</th>
+              <th>Last Activated</th>
               <th>Status</th>
               <th class="w-1">Actions</th>
             </tr>
@@ -76,19 +71,23 @@
                 <td><strong>{{.Name}}</strong></td>
                 <td>{{.Username}}</td>
                 <td>{{.CreatedAt.Format "Jan 2, 2006 3:04 PM"}}</td>
+                <td>{{if .LastActivatedAt}}{{.LastActivatedAt.Format "Jan 2, 2006 3:04 PM"}}{{else}}<span class="text-muted">Never</span>{{end}}</td>
                 <td>{{if .IsActive}}<span class="badge bg-success">Active</span>{{else}}-{{end}}</td>
                 <td>
-                  <div class="btn-group">
-                    {{if not .IsActive}}<button class="btn btn-sm btn-success" onclick="activateEndpoint('{{.Name}}')">Activate</button>{{end}}
+                  <div class="d-flex gap-1">
+                    <button class="btn btn-sm btn-success" onclick="activateEndpoint('{{.Name}}')" {{if .IsActive}}disabled{{end}}>Activate</button>
                     <button class="btn btn-sm btn-secondary" onclick="showRsyncModal('{{.Name}}')">rsync</button>
-                    {{if not .IsActive}}<button class="btn btn-sm btn-danger" onclick="showDeleteModal('{{.Name}}')">Delete</button>{{end}}
+                    <button class="btn btn-sm btn-primary" onclick="showBackupModal('{{.Name}}')" title="Backup"><i class="ti ti-archive"></i></button>
+                    <button class="btn btn-sm btn-info" onclick="showBuildInfoModal('{{.Name}}', '{{.BuildInfoPath}}')" title="Build Info"><i class="ti ti-info-circle"></i></button>
+                    <button class="btn btn-sm btn-warning" onclick="showEditEndpointDrawer('{{.Name}}', '{{.Username}}', '{{.BuildInfoPath}}')" title="Edit"><i class="ti ti-edit"></i></button>
+                    <button class="btn btn-sm btn-danger" onclick="showDeleteModal('{{.Name}}')" {{if .IsActive}}disabled{{end}}>Delete</button>
                   </div>
                 </td>
               </tr>
               {{end}}
             {{else}}
               <tr>
-                <td colspan="5" class="text-center text-muted">No endpoints yet. Create one above!</td>
+                <td colspan="6" class="text-center text-muted">No endpoints yet. Create one above!</td>
               </tr>
             {{end}}
           </tbody>
@@ -100,6 +99,10 @@
 {{end}}
 
 {{define "view-js"}}
+function loadEndpoints() {
+  window.location.reload();
+}
+
 document.getElementById('create-form').addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -129,4 +132,13 @@ document.getElementById('create-form').addEventListener('submit', async (e) => {
 });
 {{end}}
 
-{{define "page-actions"}}{{end}}
+{{define "page-actions"}}
+<a href="/backups" class="btn btn-secondary">
+  <i class="ti ti-archive"></i>
+  Backups
+</a>
+<button class="btn btn-primary" data-bs-toggle="offcanvas" data-bs-target="#create-drawer">
+  <i class="ti ti-plus"></i>
+  Create Endpoint
+</button>
+{{end}}

@@ -1,0 +1,215 @@
+{{define "content"}}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Backups</h3>
+    <div class="card-actions">
+      <div id="batch-actions" class="d-none me-2">
+        <button class="btn btn-danger" onclick="deleteSelectedBackups()" title="Delete selected">
+          <i class="ti ti-trash"></i>
+          Delete Selected (<span id="selected-count">0</span>)
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table table-striped">
+        <thead>
+          <tr>
+            <th class="w-1">
+              <input type="checkbox" class="form-check-input" id="select-all" onchange="toggleSelectAll(this)">
+            </th>
+            <th>Archive Name</th>
+            <th>Endpoint</th>
+            <th>Size</th>
+            <th>Created</th>
+            <th class="w-1">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="backups-tbody">
+          <tr>
+            <td colspan="6" class="text-center text-muted">Loading...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="text-muted" id="backups-count">0 backups</span>
+  </div>
+</div>
+{{end}}
+
+{{define "view-js"}}
+let selectedBackups = new Set();
+
+async function loadBackups() {
+  try {
+    const response = await fetch('/api/backups');
+    const backups = await response.json();
+
+    const tbody = document.getElementById('backups-tbody');
+    selectedBackups.clear();
+    updateBatchActions();
+
+    if (!backups || backups.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No backups found. Create backups from the Endpoints page.</td></tr>';
+      document.getElementById('backups-count').textContent = '0 backups';
+      document.getElementById('select-all').checked = false;
+      return;
+    }
+
+    // Sort by created date descending (newest first)
+    backups.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+    tbody.innerHTML = backups.map(backup => `
+      <tr data-archive="${escapeHtml(backup.archive_name)}">
+        <td>
+          <input type="checkbox" class="form-check-input backup-checkbox"
+                 value="${escapeHtml(backup.archive_name)}"
+                 onchange="toggleSelection(this)">
+        </td>
+        <td><code>${escapeHtml(backup.archive_name)}</code></td>
+        <td><strong>${escapeHtml(backup.endpoint_name)}</strong></td>
+        <td>${formatBytes(backup.total_size)}</td>
+        <td>${formatDate(backup.created_at)}</td>
+        <td>
+          <div class="btn-group">
+            <a href="/api/backups/${encodeURIComponent(backup.archive_name)}/download" class="btn btn-sm btn-success" download title="Download">
+              <i class="ti ti-download"></i>
+            </a>
+            <button class="btn btn-sm btn-danger" onclick="deleteBackup('${escapeHtml(backup.archive_name)}')" title="Delete">
+              <i class="ti ti-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    document.getElementById('backups-count').textContent = `${backups.length} backup${backups.length !== 1 ? 's' : ''}`;
+    document.getElementById('select-all').checked = false;
+  } catch (error) {
+    console.error('Failed to load backups:', error);
+    document.getElementById('backups-tbody').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Failed to load backups</td></tr>';
+  }
+}
+
+function formatDate(dateStr) {
+  const date = new Date(dateStr);
+  return date.toLocaleString();
+}
+
+function toggleSelectAll(checkbox) {
+  const checkboxes = document.querySelectorAll('.backup-checkbox');
+  checkboxes.forEach(cb => {
+    cb.checked = checkbox.checked;
+    if (checkbox.checked) {
+      selectedBackups.add(cb.value);
+    } else {
+      selectedBackups.delete(cb.value);
+    }
+  });
+  updateBatchActions();
+}
+
+function toggleSelection(checkbox) {
+  if (checkbox.checked) {
+    selectedBackups.add(checkbox.value);
+  } else {
+    selectedBackups.delete(checkbox.value);
+  }
+
+  // Update select-all checkbox state
+  const allCheckboxes = document.querySelectorAll('.backup-checkbox');
+  const selectAll = document.getElementById('select-all');
+  selectAll.checked = selectedBackups.size === allCheckboxes.length && allCheckboxes.length > 0;
+
+  updateBatchActions();
+}
+
+function updateBatchActions() {
+  const batchActions = document.getElementById('batch-actions');
+  const selectedCount = document.getElementById('selected-count');
+
+  if (selectedBackups.size > 0) {
+    batchActions.classList.remove('d-none');
+    selectedCount.textContent = selectedBackups.size;
+  } else {
+    batchActions.classList.add('d-none');
+  }
+}
+
+async function deleteBackup(archiveName) {
+  if (!confirm(`Are you sure you want to delete backup "${archiveName}"?`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/backups/${encodeURIComponent(archiveName)}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete backup');
+    }
+
+    showToast('Backup deleted successfully', 'success');
+    loadBackups();
+  } catch (error) {
+    console.error('Failed to delete backup:', error);
+    showToast(error.message || 'Failed to delete backup', 'error');
+  }
+}
+
+async function deleteSelectedBackups() {
+  const count = selectedBackups.size;
+  if (count === 0) return;
+
+  if (!confirm(`Are you sure you want to delete ${count} backup${count > 1 ? 's' : ''}?`)) {
+    return;
+  }
+
+  const archives = Array.from(selectedBackups);
+  let deleted = 0;
+  let failed = 0;
+
+  for (const archive of archives) {
+    try {
+      const response = await fetch(`/api/backups/${encodeURIComponent(archive)}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        deleted++;
+      } else {
+        failed++;
+      }
+    } catch (error) {
+      failed++;
+    }
+  }
+
+  if (failed > 0) {
+    showToast(`Deleted ${deleted} backup${deleted !== 1 ? 's' : ''}, ${failed} failed`, 'warning');
+  } else {
+    showToast(`Deleted ${deleted} backup${deleted !== 1 ? 's' : ''} successfully`, 'success');
+  }
+
+  loadBackups();
+}
+
+// Initial load
+loadBackups();
+{{end}}
+
+{{define "page-actions"}}
+<a href="/endpoints" class="btn btn-secondary">
+  <i class="ti ti-arrow-left"></i>
+  Back to Endpoints
+</a>
+<button class="btn btn-primary" onclick="loadBackups()">
+  <i class="ti ti-refresh"></i>
+  Refresh
+</button>
+{{end}}

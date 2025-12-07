@@ -83,6 +83,33 @@
   </div>
 </div>
 
+<!-- Build Info Modal -->
+<div class="modal modal-blur fade" id="build-info-modal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Build Info: <span id="build-info-endpoint-name"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <div id="build-info-loading" class="text-center py-4">
+          <div class="spinner-border text-primary" role="status"></div>
+          <div class="mt-2 text-muted">Loading build info...</div>
+        </div>
+        <div id="build-info-content" style="display: none;">
+          <div id="build-info-file-section">
+            <pre class="bg-dark text-light p-3 rounded" id="build-info-file-content" style="max-height: 400px; overflow: auto; white-space: pre-wrap;"></pre>
+          </div>
+          <div id="build-info-no-path" class="text-muted" style="display: none;">
+            <em>No build info path configured. Set the path in the endpoint edit drawer.</em>
+          </div>
+          <div id="build-info-error" class="alert alert-warning" style="display: none;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Delete Confirmation Modal -->
 <div class="modal modal-blur fade" id="delete-modal" tabindex="-1">
   <div class="modal-dialog modal-sm">
@@ -93,11 +120,104 @@
       </div>
       <div class="modal-body">
         <p>Enter your owner name to confirm deletion of <strong id="delete-endpoint-name"></strong>:</p>
-        <input type="text" class="form-control" id="delete-owner" placeholder="Your owner name">
+        <input type="text" class="form-control mb-3" id="delete-owner" placeholder="Your owner name">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="delete-contents" checked>
+          <label class="form-check-label" for="delete-contents">Also delete folder contents</label>
+        </div>
+        <div class="form-text text-muted">Uncheck to keep the synced files on disk</div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Backup Modal -->
+<div class="modal modal-blur fade" id="backup-modal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Backup Endpoint: <span id="backup-endpoint-name"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <!-- Preview Section -->
+        <div class="mb-3">
+          <div class="d-flex justify-content-between align-items-center mb-2">
+            <h6 class="mb-0">Preview (Dry Run)</h6>
+            <button type="button" class="btn btn-sm btn-info" onclick="previewBackup()">
+              <i class="ti ti-eye"></i> Preview Files
+            </button>
+          </div>
+          <div class="form-text mb-3">Configure backup patterns in the endpoint's Edit drawer.</div>
+
+          <div id="backup-preview-loading" class="text-center py-3" style="display: none;">
+            <div class="spinner-border text-primary" role="status"></div>
+            <div class="mt-2 text-muted">Scanning files...</div>
+          </div>
+
+          <div id="backup-preview-results" style="display: none;">
+            <div class="alert alert-info py-2">
+              <strong id="backup-preview-count">0</strong> files found
+              (<span id="backup-preview-size">0 KB</span>)
+            </div>
+            <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+              <table class="table table-sm table-vcenter">
+                <thead>
+                  <tr>
+                    <th>File</th>
+                    <th>Size</th>
+                    <th>Pattern</th>
+                  </tr>
+                </thead>
+                <tbody id="backup-preview-files"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <div id="backup-preview-empty" class="text-muted py-3 text-center" style="display: none;">
+            No files match the specified patterns.
+          </div>
+
+          <div id="backup-preview-error" class="alert alert-danger py-2" style="display: none;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="backup-create-btn" onclick="createBackup()" disabled>
+          <i class="ti ti-archive"></i> Create Backup
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Backup Success Modal -->
+<div class="modal modal-blur fade" id="backup-success-modal" tabindex="-1">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content" data-bs-theme="light">
+      <div class="modal-status bg-success"></div>
+      <div class="modal-body text-center py-4">
+        <i class="ti ti-circle-check icon-lg text-success mb-2"></i>
+        <h3 class="text-dark">Backup Created</h3>
+        <p class="text-secondary" id="backup-success-info"></p>
+      </div>
+      <div class="modal-footer">
+        <div class="w-100">
+          <div class="row">
+            <div class="col">
+              <button type="button" class="btn w-100" data-bs-dismiss="modal">Close</button>
+            </div>
+            <div class="col">
+              <a href="#" class="btn btn-success w-100" id="backup-download-link" download>
+                <i class="ti ti-download"></i> Download
+              </a>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </div>

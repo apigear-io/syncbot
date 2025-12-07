@@ -27,12 +27,6 @@
     <div class="card">
       <div class="card-header">
         <h3 class="card-title">Other Devices</h3>
-        <div class="card-actions">
-          <button class="btn btn-primary" data-bs-toggle="offcanvas" data-bs-target="#add-device-drawer">
-            <i class="ti ti-plus"></i>
-            Add Device
-          </button>
-        </div>
       </div>
       <div class="table-responsive">
         <table class="table table-vcenter card-table">
@@ -70,6 +64,10 @@
 {{end}}
 
 {{define "view-js"}}
+function renderDevices() {
+  window.location.reload();
+}
+
 document.getElementById('add-device-form').addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -89,4 +87,9 @@ document.getElementById('add-device-form').addEventListener('submit', async (e) 
 });
 {{end}}
 
-{{define "page-actions"}}{{end}}
+{{define "page-actions"}}
+<button class="btn btn-primary" data-bs-toggle="offcanvas" data-bs-target="#add-device-drawer">
+  <i class="ti ti-plus"></i>
+  Add Device
+</button>
+{{end}}

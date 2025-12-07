@@ -19,6 +19,7 @@ type Handlers struct {
 	endpointService   *services.EndpointService
 	activationService *services.ActivationService
 	commandService    *services.CommandService
+	backupService     *services.BackupService
 	logService        *services.LogService
 	eventService      *services.EventService
 	authService       *services.AuthService
@@ -26,7 +27,7 @@ type Handlers struct {
 	viewTemplates     map[string]*template.Template
 }
 
-func NewHandlers(cfg *config.Config, endpointSvc *services.EndpointService, activationSvc *services.ActivationService, commandSvc *services.CommandService, logSvc *services.LogService, eventSvc *services.EventService, authSvc *services.AuthService, termSvc *services.TerminalService) (*Handlers, error) {
+func NewHandlers(cfg *config.Config, endpointSvc *services.EndpointService, activationSvc *services.ActivationService, commandSvc *services.CommandService, backupSvc *services.BackupService, logSvc *services.LogService, eventSvc *services.EventService, authSvc *services.AuthService, termSvc *services.TerminalService) (*Handlers, error) {
 	// Shared template files
 	sharedFiles := []string{
 		"templates/base.html",
@@ -44,6 +45,7 @@ func NewHandlers(cfg *config.Config, endpointSvc *services.EndpointService, acti
 		"settings":  {"templates/settings.html", "templates/_help_settings.html"},
 		"sync":      {"templates/sync.html", "templates/_help_sync.html"},
 		"terminal":  {"templates/terminal.html", "templates/_help_terminal.html"},
+		"backups":   {"templates/backups.html", "templates/_help_backups.html"},
 	}
 
 	viewTemplates := make(map[string]*template.Template)
@@ -63,6 +65,7 @@ func NewHandlers(cfg *config.Config, endpointSvc *services.EndpointService, acti
 		endpointService:   endpointSvc,
 		activationService: activationSvc,
 		commandService:    commandSvc,
+		backupService:     backupSvc,
 		logService:        logSvc,
 		eventService:      eventSvc,
 		authService:       authSvc,
@@ -159,4 +162,8 @@ func (h *Handlers) SettingsPage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) SyncPage(w http.ResponseWriter, r *http.Request) {
 	h.renderPage(w, "sync", h.defaultPageData("sync", "Sync Settings"))
+}
+
+func (h *Handlers) BackupsPage(w http.ResponseWriter, r *http.Request) {
+	h.renderPage(w, "backups", h.defaultPageData("backups", "Backups"))
 }

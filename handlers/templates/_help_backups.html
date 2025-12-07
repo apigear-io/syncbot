@@ -1,0 +1,32 @@
+{{define "view-help"}}
+<h5>Backups</h5>
+<p>This page lists all backup archives created from endpoints.</p>
+
+<h6>Creating Backups</h6>
+<ol>
+  <li>Go to the <strong>Endpoints</strong> page</li>
+  <li>Click the <strong>Edit</strong> button on an endpoint</li>
+  <li>Configure <strong>Backup Patterns</strong> (e.g., <code>*.log</code>, <code>config/*</code>)</li>
+  <li>Save the endpoint</li>
+  <li>Click the <strong>Backup</strong> button (archive icon) on that endpoint</li>
+  <li>Preview the files, then click <strong>Create Backup</strong></li>
+</ol>
+
+<h6>Backup Patterns</h6>
+<p>Patterns use glob syntax:</p>
+<ul>
+  <li><code>*</code> - matches any files in current directory</li>
+  <li><code>**</code> - matches directories recursively</li>
+  <li><code>?</code> - matches single character</li>
+</ul>
+
+<h6>Examples</h6>
+<ul>
+  <li><code>*.log</code> - all .log files in root</li>
+  <li><code>logs/**/*.log</code> - all .log files in logs/ recursively</li>
+  <li><code>config/*.json</code> - all .json files in config/</li>
+</ul>
+
+<h6>Storage</h6>
+<p>Backups are stored in the <code>backups/</code> folder relative to the SyncBot executable as <code>.tgz</code> archives.</p>
+{{end}}

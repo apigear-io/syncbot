@@ -130,6 +130,121 @@ function copyToClipboard(text) {
   }
 }
 
+// Edit endpoint functions
+async function showEditEndpointDrawer(name, owner, buildInfoPath) {
+  document.getElementById('edit-endpoint-name').value = name;
+  document.getElementById('edit-endpoint-name-title').textContent = name;
+  document.getElementById('edit-endpoint-owner').value = owner;
+  document.getElementById('edit-endpoint-build-info-path').value = buildInfoPath || '';
+  document.getElementById('edit-endpoint-backup-patterns').value = '';
+
+  // Load backup patterns
+  try {
+    const response = await fetch(`/api/endpoints/${encodeURIComponent(name)}/backup/patterns`);
+    const data = await response.json();
+    if (response.ok && data.patterns) {
+      document.getElementById('edit-endpoint-backup-patterns').value = data.patterns.join('\n');
+    }
+  } catch (error) {
+    console.error('Failed to load backup patterns:', error);
+  }
+
+  new bootstrap.Offcanvas(document.getElementById('edit-endpoint-drawer')).show();
+}
+
+document.getElementById('edit-endpoint-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const name = document.getElementById('edit-endpoint-name').value;
+  const username = document.getElementById('edit-endpoint-owner').value.trim();
+  const buildInfoPath = document.getElementById('edit-endpoint-build-info-path').value.trim();
+  const backupPatternsText = document.getElementById('edit-endpoint-backup-patterns').value;
+  const backupPatterns = backupPatternsText.split('\n').map(p => p.trim()).filter(p => p);
+
+  try {
+    // Update endpoint info
+    const response = await fetch(`/api/endpoints/${encodeURIComponent(name)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, build_info_path: buildInfoPath })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      showToast('Error', data.error, 'danger');
+      return;
+    }
+
+    // Update backup patterns
+    const patternsResponse = await fetch(`/api/endpoints/${encodeURIComponent(name)}/backup/patterns`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ patterns: backupPatterns })
+    });
+
+    if (!patternsResponse.ok) {
+      const patternsData = await patternsResponse.json();
+      showToast('Warning', `Endpoint updated but backup patterns failed: ${patternsData.error}`, 'warning');
+    }
+
+    showToast('Success', `Endpoint "${name}" updated`, 'success');
+    bootstrap.Offcanvas.getInstance(document.getElementById('edit-endpoint-drawer')).hide();
+    window.location.reload();
+  } catch (error) {
+    showToast('Error', 'Failed to update endpoint', 'danger');
+  }
+});
+
+// Build info functions
+let currentBuildInfoEndpoint = '';
+
+function showBuildInfoModal(name, currentPath) {
+  currentBuildInfoEndpoint = name;
+  document.getElementById('build-info-endpoint-name').textContent = name;
+  document.getElementById('build-info-loading').style.display = 'block';
+  document.getElementById('build-info-content').style.display = 'none';
+
+  new bootstrap.Modal(document.getElementById('build-info-modal')).show();
+
+  // Load the build info
+  loadBuildInfo(name, currentPath);
+}
+
+async function loadBuildInfo(name, currentPath) {
+  document.getElementById('build-info-loading').style.display = 'none';
+  document.getElementById('build-info-content').style.display = 'block';
+
+  if (!currentPath) {
+    document.getElementById('build-info-file-section').style.display = 'none';
+    document.getElementById('build-info-no-path').style.display = 'block';
+    document.getElementById('build-info-error').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('build-info-no-path').style.display = 'none';
+
+  try {
+    const response = await fetch(`/api/endpoints/${encodeURIComponent(name)}/build-info`);
+    const data = await response.json();
+
+    if (!response.ok) {
+      document.getElementById('build-info-file-section').style.display = 'none';
+      document.getElementById('build-info-error').style.display = 'block';
+      document.getElementById('build-info-error').textContent = data.error;
+      return;
+    }
+
+    document.getElementById('build-info-file-section').style.display = 'block';
+    document.getElementById('build-info-error').style.display = 'none';
+    document.getElementById('build-info-file-content').textContent = data.content;
+  } catch (error) {
+    document.getElementById('build-info-file-section').style.display = 'none';
+    document.getElementById('build-info-error').style.display = 'block';
+    document.getElementById('build-info-error').textContent = 'Failed to load build info';
+  }
+}
+
 // Activation functions
 function activateEndpoint(name) {
   pendingActivateEndpoint = name;
@@ -184,6 +299,7 @@ function showDeleteModal(name) {
 
 async function confirmDelete() {
   const username = document.getElementById('delete-owner').value.trim();
+  const deleteContents = document.getElementById('delete-contents').checked;
 
   if (!username) {
     showToast('Error', 'Please enter your owner name', 'danger');
@@ -194,7 +310,7 @@ async function confirmDelete() {
     const response = await fetch(`/api/endpoints/${encodeURIComponent(deleteEndpointName)}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username })
+      body: JSON.stringify({ username, delete_contents: deleteContents })
     });
 
     if (response.status === 204) {
@@ -322,6 +438,119 @@ async function importDevicesFromCSV() {
   document.getElementById('csv-replace-all').checked = false;
 
   showToast('Success', `Imported ${newDevices.length} device(s)`, 'success');
+}
+
+// Backup functions
+let currentBackupEndpoint = '';
+
+function showBackupModal(name) {
+  currentBackupEndpoint = name;
+  document.getElementById('backup-endpoint-name').textContent = name;
+
+  // Reset preview state
+  document.getElementById('backup-preview-loading').style.display = 'none';
+  document.getElementById('backup-preview-results').style.display = 'none';
+  document.getElementById('backup-preview-empty').style.display = 'none';
+  document.getElementById('backup-preview-error').style.display = 'none';
+  document.getElementById('backup-create-btn').disabled = true;
+
+  new bootstrap.Modal(document.getElementById('backup-modal')).show();
+}
+
+async function previewBackup() {
+  document.getElementById('backup-preview-loading').style.display = 'block';
+  document.getElementById('backup-preview-results').style.display = 'none';
+  document.getElementById('backup-preview-empty').style.display = 'none';
+  document.getElementById('backup-preview-error').style.display = 'none';
+  document.getElementById('backup-create-btn').disabled = true;
+
+  try {
+    const response = await fetch(`/api/endpoints/${encodeURIComponent(currentBackupEndpoint)}/backup/preview`);
+    const data = await response.json();
+
+    document.getElementById('backup-preview-loading').style.display = 'none';
+
+    if (!response.ok) {
+      document.getElementById('backup-preview-error').style.display = 'block';
+      document.getElementById('backup-preview-error').textContent = data.error;
+      return;
+    }
+
+    if (data.file_count === 0) {
+      document.getElementById('backup-preview-empty').style.display = 'block';
+      return;
+    }
+
+    document.getElementById('backup-preview-results').style.display = 'block';
+    document.getElementById('backup-preview-count').textContent = data.file_count;
+    document.getElementById('backup-preview-size').textContent = formatBytes(data.total_size);
+
+    const tbody = document.getElementById('backup-preview-files');
+    tbody.innerHTML = '';
+
+    data.files.forEach(file => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="font-monospace small">${escapeHtml(file.path)}</td>
+        <td class="text-nowrap">${formatBytes(file.size)}</td>
+        <td class="font-monospace small text-muted">${escapeHtml(file.matched_by)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('backup-create-btn').disabled = false;
+
+  } catch (error) {
+    document.getElementById('backup-preview-loading').style.display = 'none';
+    document.getElementById('backup-preview-error').style.display = 'block';
+    document.getElementById('backup-preview-error').textContent = 'Failed to preview backup';
+  }
+}
+
+async function createBackup() {
+  document.getElementById('backup-create-btn').disabled = true;
+  document.getElementById('backup-create-btn').innerHTML = '<span class="spinner-border spinner-border-sm"></span> Creating...';
+
+  try {
+    const response = await fetch(`/api/endpoints/${encodeURIComponent(currentBackupEndpoint)}/backup`, {
+      method: 'POST'
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      showToast('Error', data.error, 'danger');
+      document.getElementById('backup-create-btn').disabled = false;
+      document.getElementById('backup-create-btn').innerHTML = '<i class="ti ti-archive"></i> Create Backup';
+      return;
+    }
+
+    // Hide backup modal
+    bootstrap.Modal.getInstance(document.getElementById('backup-modal')).hide();
+
+    // Show success modal
+    document.getElementById('backup-success-info').innerHTML = `
+      <strong>${escapeHtml(data.archive_name)}</strong><br>
+      ${data.file_count} files (${formatBytes(data.total_size)})
+    `;
+    document.getElementById('backup-download-link').href = data.download_url;
+
+    new bootstrap.Modal(document.getElementById('backup-success-modal')).show();
+
+  } catch (error) {
+    showToast('Error', 'Failed to create backup', 'danger');
+  } finally {
+    document.getElementById('backup-create-btn').disabled = false;
+    document.getElementById('backup-create-btn').innerHTML = '<i class="ti ti-archive"></i> Create Backup';
+  }
+}
+
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 // Connect to SSE on page load

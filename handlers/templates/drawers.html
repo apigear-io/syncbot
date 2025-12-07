@@ -72,6 +72,41 @@ device-02,http://192.168.1.101:8081,Secondary device,Room 102"></textarea>
   </div>
 </div>
 
+<!-- Edit Endpoint Drawer -->
+<div class="offcanvas offcanvas-end" tabindex="-1" id="edit-endpoint-drawer" data-bs-theme="light">
+  <div class="offcanvas-header">
+    <h5 class="offcanvas-title">Edit Endpoint: <span id="edit-endpoint-name-title"></span></h5>
+    <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+  </div>
+  <div class="offcanvas-body">
+    <form id="edit-endpoint-form">
+      <input type="hidden" id="edit-endpoint-name">
+      <div class="mb-3">
+        <label class="form-label">Owner</label>
+        <input type="text" class="form-control" id="edit-endpoint-owner" placeholder="john" required>
+        <div class="form-text">Contact person for this endpoint</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Build Info Path</label>
+        <input type="text" class="form-control" id="edit-endpoint-build-info-path" placeholder="version.txt">
+        <div class="form-text">Relative path to build info file (optional)</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label">Backup Patterns</label>
+        <textarea class="form-control font-monospace" id="edit-endpoint-backup-patterns" rows="4" placeholder="*.log&#10;config/*&#10;logs/**/*.txt"></textarea>
+        <div class="form-text">
+          One pattern per line. Wildcards: <code>*</code> matches files, <code>**</code> matches directories recursively.
+          <br>Examples: <code>*.log</code>, <code>config/*.json</code>, <code>logs/**/*.txt</code>
+        </div>
+      </div>
+      <div class="d-grid gap-2">
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="offcanvas">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Create Endpoint Drawer -->
 <div class="offcanvas offcanvas-end" tabindex="-1" id="create-drawer" data-bs-theme="light">
   <div class="offcanvas-header">

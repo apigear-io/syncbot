@@ -3,6 +3,7 @@ module syncbot
 go 1.25.4
 
 require (
+	github.com/bmatcuk/doublestar/v4 v4.9.1
 	github.com/creack/pty v1.1.21
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/gorilla/websocket v1.5.1

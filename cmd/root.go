@@ -77,10 +77,15 @@ func runServer(cmd *cobra.Command, args []string) {
 	activationSvc := services.NewActivationService(cfg, logSvc, eventSvc)
 	endpointSvc := services.NewEndpointService(cfg, activationSvc, logSvc, eventSvc)
 	commandSvc := services.NewCommandService(cfg, logSvc, eventSvc, activationSvc)
+	backupSvc, err := services.NewBackupService(cfg, logSvc, eventSvc)
+	if err != nil {
+		logSvc.Error("startup", "Failed to initialize backup service: "+err.Error())
+		os.Exit(1)
+	}
 	authSvc := services.NewAuthService(cfg, logSvc)
 	termSvc := services.NewTerminalService(cfg, authSvc, logSvc)
 
-	h, err := handlers.NewHandlers(cfg, endpointSvc, activationSvc, commandSvc, logSvc, eventSvc, authSvc, termSvc)
+	h, err := handlers.NewHandlers(cfg, endpointSvc, activationSvc, commandSvc, backupSvc, logSvc, eventSvc, authSvc, termSvc)
 	if err != nil {
 		logSvc.Error("startup", "Failed to initialize handlers: "+err.Error())
 		os.Exit(1)
@@ -102,13 +107,17 @@ func runServer(cmd *cobra.Command, args []string) {
 	r.Get("/settings", h.SettingsPage)
 	r.Get("/sync", h.SyncPage)
 	r.Get("/terminal", h.TerminalPage)
+	r.Get("/backups", h.BackupsPage)
 
 	// API routes
 	r.Route("/api", func(r chi.Router) {
 		r.Get("/endpoints", h.ListEndpoints)
 		r.Post("/endpoints", h.CreateEndpoint)
+		r.Put("/endpoints/{name}", h.UpdateEndpoint)
 		r.Delete("/endpoints/{name}", h.DeleteEndpoint)
 		r.Post("/endpoints/{name}/activate", h.ActivateEndpoint)
+		r.Put("/endpoints/{name}/build-info-path", h.UpdateEndpointBuildInfoPath)
+		r.Get("/endpoints/{name}/build-info", h.GetEndpointBuildInfo)
 		r.Get("/active", h.GetActive)
 		r.Get("/config", h.GetConfig)
 		r.Get("/settings", h.GetSettings)
@@ -130,6 +139,16 @@ func runServer(cmd *cobra.Command, args []string) {
 		r.Get("/sync/settings", h.GetSyncSettings)
 		r.Post("/sync/fetch", h.SyncFetch)
 		r.Post("/sync/apply", h.SyncApply)
+
+		// Backup routes
+		r.Get("/endpoints/{name}/backup/patterns", h.GetBackupPatterns)
+		r.Put("/endpoints/{name}/backup/patterns", h.UpdateBackupPatterns)
+		r.Get("/endpoints/{name}/backup/preview", h.PreviewBackup)
+		r.Post("/endpoints/{name}/backup", h.CreateBackup)
+		r.Get("/endpoints/{name}/backups", h.ListBackups)
+		r.Get("/backups", h.ListAllBackups)
+		r.Get("/backups/{archive}/download", h.DownloadBackup)
+		r.Delete("/backups/{archive}", h.DeleteBackup)
 
 		// Terminal routes
 		r.Post("/terminal/auth", h.TerminalLogin)

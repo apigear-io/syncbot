@@ -19,7 +19,8 @@ type CreateEndpointRequest struct {
 }
 
 type DeleteEndpointRequest struct {
-	Username string `json:"username"`
+	Username       string `json:"username"`
+	DeleteContents *bool  `json:"delete_contents,omitempty"`
 }
 
 type ErrorResponse struct {
@@ -71,7 +72,13 @@ func (h *Handlers) DeleteEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.endpointService.Delete(name, req.Username); err != nil {
+	// Default to deleting contents if not specified
+	deleteContents := true
+	if req.DeleteContents != nil {
+		deleteContents = *req.DeleteContents
+	}
+
+	if err := h.endpointService.Delete(name, req.Username, deleteContents); err != nil {
 		status := http.StatusBadRequest
 		if err.Error() == "unauthorized: only the owner can delete this endpoint" {
 			status = http.StatusForbidden
@@ -91,7 +98,72 @@ func (h *Handlers) ActivateEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Update the last activated timestamp
+	if err := h.endpointService.UpdateLastActivated(name); err != nil {
+		h.logService.Warn("activation", "Failed to update last activated timestamp: "+err.Error())
+	}
+
 	writeJSON(w, http.StatusOK, map[string]string{"status": "activated", "name": name})
+}
+
+type UpdateEndpointRequest struct {
+	Username      string `json:"username"`
+	BuildInfoPath string `json:"build_info_path"`
+}
+
+type UpdateBuildInfoPathRequest struct {
+	BuildInfoPath string `json:"build_info_path"`
+}
+
+func (h *Handlers) UpdateEndpoint(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	var req UpdateEndpointRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+		return
+	}
+
+	if req.Username == "" {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "username is required"})
+		return
+	}
+
+	if err := h.endpointService.Update(name, req.Username, req.BuildInfoPath); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+func (h *Handlers) UpdateEndpointBuildInfoPath(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	var req UpdateBuildInfoPathRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+		return
+	}
+
+	if err := h.endpointService.UpdateBuildInfoPath(name, req.BuildInfoPath); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+func (h *Handlers) GetEndpointBuildInfo(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	content, err := h.endpointService.GetBuildInfo(name)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"content": content})
 }
 
 func (h *Handlers) GetActive(w http.ResponseWriter, r *http.Request) {
@@ -682,4 +754,204 @@ func (h *Handlers) SyncApply(w http.ResponseWriter, r *http.Request) {
 		NeedsReload: needsReload,
 		Message:     fmt.Sprintf("Successfully applied %d settings", changesApplied),
 	})
+}
+
+// Backup API handlers
+
+type UpdateBackupPatternsRequest struct {
+	Patterns []string `json:"patterns"`
+}
+
+type BackupPreviewResponse struct {
+	EndpointName string               `json:"endpoint_name"`
+	Patterns     []string             `json:"patterns"`
+	Files        []BackupFileResponse `json:"files"`
+	TotalSize    int64                `json:"total_size"`
+	FileCount    int                  `json:"file_count"`
+}
+
+type BackupFileResponse struct {
+	Path      string `json:"path"`
+	Size      int64  `json:"size"`
+	ModTime   string `json:"mod_time"`
+	MatchedBy string `json:"matched_by"`
+}
+
+type BackupResultResponse struct {
+	EndpointName string `json:"endpoint_name"`
+	ArchivePath  string `json:"archive_path"`
+	ArchiveName  string `json:"archive_name"`
+	FileCount    int    `json:"file_count"`
+	TotalSize    int64  `json:"total_size"`
+	CreatedAt    string `json:"created_at"`
+	DownloadURL  string `json:"download_url"`
+}
+
+// GetBackupPatterns returns the backup patterns for an endpoint
+// GET /api/endpoints/{name}/backup/patterns
+func (h *Handlers) GetBackupPatterns(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	patterns, err := h.endpointService.GetBackupPatterns(name)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string][]string{"patterns": patterns})
+}
+
+// UpdateBackupPatterns updates the backup patterns for an endpoint
+// PUT /api/endpoints/{name}/backup/patterns
+func (h *Handlers) UpdateBackupPatterns(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	var req UpdateBackupPatternsRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "invalid request body"})
+		return
+	}
+
+	if err := h.endpointService.UpdateBackupPatterns(name, req.Patterns); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+}
+
+// PreviewBackup returns a list of files that would be backed up
+// GET /api/endpoints/{name}/backup/preview
+func (h *Handlers) PreviewBackup(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	// Get stored patterns for this endpoint
+	patterns, err := h.endpointService.GetBackupPatterns(name)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	if len(patterns) == 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "no backup patterns configured"})
+		return
+	}
+
+	preview, err := h.backupService.Preview(name, patterns)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	// Convert to response type
+	files := make([]BackupFileResponse, len(preview.Files))
+	for i, f := range preview.Files {
+		files[i] = BackupFileResponse{
+			Path:      f.Path,
+			Size:      f.Size,
+			ModTime:   f.ModTime,
+			MatchedBy: f.MatchedBy,
+		}
+	}
+
+	writeJSON(w, http.StatusOK, BackupPreviewResponse{
+		EndpointName: preview.EndpointName,
+		Patterns:     preview.Patterns,
+		Files:        files,
+		TotalSize:    preview.TotalSize,
+		FileCount:    preview.FileCount,
+	})
+}
+
+// CreateBackup creates a backup archive
+// POST /api/endpoints/{name}/backup
+func (h *Handlers) CreateBackup(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	// Get stored patterns for this endpoint
+	patterns, err := h.endpointService.GetBackupPatterns(name)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	if len(patterns) == 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: "no backup patterns configured"})
+		return
+	}
+
+	result, err := h.backupService.CreateBackup(name, patterns)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, BackupResultResponse{
+		EndpointName: result.EndpointName,
+		ArchivePath:  result.ArchivePath,
+		ArchiveName:  result.ArchiveName,
+		FileCount:    result.FileCount,
+		TotalSize:    result.TotalSize,
+		CreatedAt:    result.CreatedAt.Format("2006-01-02 15:04:05"),
+		DownloadURL:  fmt.Sprintf("/api/backups/%s/download", result.ArchiveName),
+	})
+}
+
+// ListBackups returns all backups for an endpoint
+// GET /api/endpoints/{name}/backups
+func (h *Handlers) ListBackups(w http.ResponseWriter, r *http.Request) {
+	name := chi.URLParam(r, "name")
+
+	backups, err := h.backupService.ListBackups(name)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, backups)
+}
+
+// ListAllBackups returns all backups across all endpoints
+// GET /api/backups
+func (h *Handlers) ListAllBackups(w http.ResponseWriter, r *http.Request) {
+	backups, err := h.backupService.ListAllBackups()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, backups)
+}
+
+// DownloadBackup serves a backup archive for download
+// GET /api/backups/{archive}/download
+func (h *Handlers) DownloadBackup(w http.ResponseWriter, r *http.Request) {
+	archiveName := chi.URLParam(r, "archive")
+
+	archivePath, err := h.backupService.GetBackupPath(archiveName)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", archiveName))
+	w.Header().Set("Content-Type", "application/gzip")
+	http.ServeFile(w, r, archivePath)
+}
+
+// DeleteBackup deletes a backup archive
+// DELETE /api/backups/{archive}
+func (h *Handlers) DeleteBackup(w http.ResponseWriter, r *http.Request) {
+	archiveName := chi.URLParam(r, "archive")
+
+	if err := h.backupService.DeleteBackup(archiveName); err != nil {
+		status := http.StatusNotFound
+		if strings.Contains(err.Error(), "failed to delete") {
+			status = http.StatusInternalServerError
+		}
+		writeJSON(w, status, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

@@ -3,15 +3,48 @@ package models
 import "time"
 
 type Endpoint struct {
-	Name      string    `json:"name"`
-	Username  string    `json:"username"`
-	CreatedAt time.Time `json:"created_at"`
-	IsActive  bool      `json:"is_active"`
+	Name            string     `json:"name"`
+	Username        string     `json:"username"`
+	CreatedAt       time.Time  `json:"created_at"`
+	LastActivatedAt *time.Time `json:"last_activated_at,omitempty"`
+	BuildInfoPath   string     `json:"build_info_path,omitempty"`
+	BackupPatterns  []string   `json:"backup_patterns,omitempty"`
+	IsActive        bool       `json:"is_active"`
 }
 
 type EndpointMetadata struct {
-	Username  string    `json:"username"`
-	CreatedAt time.Time `json:"created_at"`
+	Username        string     `json:"username"`
+	CreatedAt       time.Time  `json:"created_at"`
+	LastActivatedAt *time.Time `json:"last_activated_at,omitempty"`
+	BuildInfoPath   string     `json:"build_info_path,omitempty"`
+	BackupPatterns  []string   `json:"backup_patterns,omitempty"`
+}
+
+// BackupResult represents the result of a backup operation
+type BackupResult struct {
+	EndpointName string    `json:"endpoint_name"`
+	ArchivePath  string    `json:"archive_path"`
+	ArchiveName  string    `json:"archive_name"`
+	FileCount    int       `json:"file_count"`
+	TotalSize    int64     `json:"total_size"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// BackupPreview represents files that would be included in a backup
+type BackupPreview struct {
+	EndpointName string       `json:"endpoint_name"`
+	Patterns     []string     `json:"patterns"`
+	Files        []BackupFile `json:"files"`
+	TotalSize    int64        `json:"total_size"`
+	FileCount    int          `json:"file_count"`
+}
+
+// BackupFile represents a single file in a backup preview
+type BackupFile struct {
+	Path      string `json:"path"`
+	Size      int64  `json:"size"`
+	ModTime   string `json:"mod_time"`
+	MatchedBy string `json:"matched_by"`
 }
 
 // Command represents a user-defined command that can be executed on the device

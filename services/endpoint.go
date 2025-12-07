@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	"syncbot/config"
@@ -92,10 +93,13 @@ func (s *EndpointService) Get(name string) (*models.Endpoint, error) {
 	activeEndpoint := s.activationService.GetActive()
 
 	return &models.Endpoint{
-		Name:      name,
-		Username:  metadata.Username,
-		CreatedAt: metadata.CreatedAt,
-		IsActive:  name == activeEndpoint,
+		Name:            name,
+		Username:        metadata.Username,
+		CreatedAt:       metadata.CreatedAt,
+		LastActivatedAt: metadata.LastActivatedAt,
+		BuildInfoPath:   metadata.BuildInfoPath,
+		BackupPatterns:  metadata.BackupPatterns,
+		IsActive:        name == activeEndpoint,
 	}, nil
 }
 
@@ -165,7 +169,130 @@ func (s *EndpointService) Create(name, username string) (*models.Endpoint, error
 	return endpoint, nil
 }
 
-func (s *EndpointService) Delete(name, username string) error {
+func (s *EndpointService) Update(name, username, buildInfoPath string) error {
+	metadataPath := s.metadataPath(name)
+
+	data, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return fmt.Errorf("failed to read endpoint metadata: %w", err)
+	}
+
+	var metadata models.EndpointMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return fmt.Errorf("failed to parse endpoint metadata: %w", err)
+	}
+
+	metadata.Username = username
+	metadata.BuildInfoPath = buildInfoPath
+
+	updatedData, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	if err := os.WriteFile(metadataPath, updatedData, 0644); err != nil {
+		return fmt.Errorf("failed to write metadata: %w", err)
+	}
+
+	s.logSvc.Info("endpoint", fmt.Sprintf("Updated endpoint '%s': owner='%s', build_info_path='%s'", name, username, buildInfoPath))
+	return nil
+}
+
+func (s *EndpointService) UpdateBuildInfoPath(name, buildInfoPath string) error {
+	metadataPath := s.metadataPath(name)
+
+	data, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return fmt.Errorf("failed to read endpoint metadata: %w", err)
+	}
+
+	var metadata models.EndpointMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return fmt.Errorf("failed to parse endpoint metadata: %w", err)
+	}
+
+	metadata.BuildInfoPath = buildInfoPath
+
+	updatedData, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	if err := os.WriteFile(metadataPath, updatedData, 0644); err != nil {
+		return fmt.Errorf("failed to write metadata: %w", err)
+	}
+
+	s.logSvc.Info("endpoint", fmt.Sprintf("Updated build info path for '%s' to '%s'", name, buildInfoPath))
+	return nil
+}
+
+func (s *EndpointService) GetBuildInfo(name string) (string, error) {
+	endpoint, err := s.Get(name)
+	if err != nil {
+		return "", err
+	}
+
+	if endpoint.BuildInfoPath == "" {
+		return "", fmt.Errorf("no build info path configured for this endpoint")
+	}
+
+	// Build full path: endpoints_path / endpoint_name / build_info_path
+	fullPath := filepath.Join(s.cfg.EndpointsPath, name, endpoint.BuildInfoPath)
+
+	// Security check: ensure the path is within the endpoint directory
+	endpointDir := filepath.Join(s.cfg.EndpointsPath, name)
+	absPath, err := filepath.Abs(fullPath)
+	if err != nil {
+		return "", fmt.Errorf("invalid path")
+	}
+	absEndpointDir, err := filepath.Abs(endpointDir)
+	if err != nil {
+		return "", fmt.Errorf("invalid endpoint path")
+	}
+	if !strings.HasPrefix(absPath, absEndpointDir) {
+		return "", fmt.Errorf("path traversal not allowed")
+	}
+
+	content, err := os.ReadFile(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("build info file not found")
+		}
+		return "", fmt.Errorf("failed to read build info file: %w", err)
+	}
+
+	return string(content), nil
+}
+
+func (s *EndpointService) UpdateLastActivated(name string) error {
+	metadataPath := s.metadataPath(name)
+
+	data, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return fmt.Errorf("failed to read endpoint metadata: %w", err)
+	}
+
+	var metadata models.EndpointMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return fmt.Errorf("failed to parse endpoint metadata: %w", err)
+	}
+
+	now := time.Now().UTC()
+	metadata.LastActivatedAt = &now
+
+	updatedData, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	if err := os.WriteFile(metadataPath, updatedData, 0644); err != nil {
+		return fmt.Errorf("failed to write metadata: %w", err)
+	}
+
+	return nil
+}
+
+func (s *EndpointService) Delete(name, username string, deleteContents bool) error {
 	endpoint, err := s.Get(name)
 	if err != nil {
 		s.logSvc.Warn("endpoint", fmt.Sprintf("Delete attempted on non-existent endpoint '%s'", name))
@@ -183,9 +310,13 @@ func (s *EndpointService) Delete(name, username string) error {
 	}
 
 	endpointPath := filepath.Join(s.cfg.EndpointsPath, name)
-	if err := os.RemoveAll(endpointPath); err != nil {
-		s.logSvc.Error("endpoint", fmt.Sprintf("Failed to delete endpoint '%s': %s", name, err.Error()))
-		return fmt.Errorf("failed to delete endpoint: %w", err)
+	if deleteContents {
+		if err := os.RemoveAll(endpointPath); err != nil {
+			s.logSvc.Error("endpoint", fmt.Sprintf("Failed to delete endpoint '%s': %s", name, err.Error()))
+			return fmt.Errorf("failed to delete endpoint: %w", err)
+		}
+	} else {
+		s.logSvc.Info("endpoint", fmt.Sprintf("Keeping folder contents for endpoint '%s'", name))
 	}
 
 	// Also delete the metadata file
@@ -203,5 +334,51 @@ func (s *EndpointService) Delete(name, username string) error {
 		Payload: map[string]string{"name": name, "username": username},
 	})
 
+	return nil
+}
+
+// GetBackupPatterns returns the backup patterns for an endpoint
+func (s *EndpointService) GetBackupPatterns(name string) ([]string, error) {
+	metadataPath := s.metadataPath(name)
+
+	data, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read endpoint metadata: %w", err)
+	}
+
+	var metadata models.EndpointMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return nil, fmt.Errorf("failed to parse endpoint metadata: %w", err)
+	}
+
+	return metadata.BackupPatterns, nil
+}
+
+// UpdateBackupPatterns updates the backup patterns for an endpoint
+func (s *EndpointService) UpdateBackupPatterns(name string, patterns []string) error {
+	metadataPath := s.metadataPath(name)
+
+	data, err := os.ReadFile(metadataPath)
+	if err != nil {
+		return fmt.Errorf("failed to read endpoint metadata: %w", err)
+	}
+
+	var metadata models.EndpointMetadata
+	if err := json.Unmarshal(data, &metadata); err != nil {
+		return fmt.Errorf("failed to parse endpoint metadata: %w", err)
+	}
+
+	metadata.BackupPatterns = patterns
+
+	updatedData, err := json.MarshalIndent(metadata, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal metadata: %w", err)
+	}
+
+	if err := os.WriteFile(metadataPath, updatedData, 0644); err != nil {
+		return fmt.Errorf("failed to write metadata: %w", err)
+	}
+
+	s.logSvc.Info("endpoint", fmt.Sprintf("Updated backup patterns for '%s': %v", name, patterns))
 	return nil
 }
