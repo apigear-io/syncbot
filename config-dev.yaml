@@ -1,0 +1,13 @@
+device_name: DJP7W0L09N
+device_description: SyncBot Device
+device_location: ""
+endpoints_path: /Users/jryannel/syncbot/endpoints
+active_symlink: /Users/jryannel/syncbot/active
+post_activation_command: ""
+port: 8081
+device_ip: localhost
+ssh_username: sync
+devices: []
+commands: []
+terminal:
+  shell: /bin/bash
