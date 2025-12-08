@@ -75,7 +75,7 @@
                 <td>{{if .IsActive}}<span class="badge bg-success">Active</span>{{else}}-{{end}}</td>
                 <td>
                   <div class="d-flex gap-1">
-                    <button class="btn btn-sm btn-success" onclick="activateEndpoint('{{.Name}}')" {{if .IsActive}}disabled{{end}}>Activate</button>
+                    <button class="btn btn-sm btn-success" onclick="activateEndpoint('{{.Name}}')">{{if .IsActive}}Re-activate{{else}}Activate{{end}}</button>
                     <button class="btn btn-sm btn-secondary" onclick="showRsyncModal('{{.Name}}')">rsync</button>
                     <button class="btn btn-sm btn-primary" onclick="showBackupModal('{{.Name}}')" title="Backup"><i class="ti ti-archive"></i></button>
                     <button class="btn btn-sm btn-info" onclick="showBuildInfoModal('{{.Name}}', '{{.BuildInfoPath}}')" title="Build Info"><i class="ti ti-info-circle"></i></button>
