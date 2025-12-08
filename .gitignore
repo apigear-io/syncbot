@@ -5,3 +5,4 @@ devices.txt
 syncbot
 /test-endpoints
 config.yaml
+*.tgz
