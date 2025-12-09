@@ -3,20 +3,20 @@ package services
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"syncbot/config"
 )
 
 type ActivationService struct {
-	cfg      *config.Config
-	logSvc   *LogService
-	eventSvc *EventService
+	cfg        *config.Config
+	logSvc     *LogService
+	eventSvc   *EventService
+	processSvc *ProcessService
 }
 
-func NewActivationService(cfg *config.Config, logSvc *LogService, eventSvc *EventService) *ActivationService {
-	return &ActivationService{cfg: cfg, logSvc: logSvc, eventSvc: eventSvc}
+func NewActivationService(cfg *config.Config, logSvc *LogService, eventSvc *EventService, processSvc *ProcessService) *ActivationService {
+	return &ActivationService{cfg: cfg, logSvc: logSvc, eventSvc: eventSvc, processSvc: processSvc}
 }
 
 func (s *ActivationService) GetActive() string {
@@ -27,7 +27,8 @@ func (s *ActivationService) GetActive() string {
 	return filepath.Base(target)
 }
 
-func (s *ActivationService) Activate(name string) error {
+// Activate activates an endpoint. If activationCommand is empty, uses the global default.
+func (s *ActivationService) Activate(name string, activationCommand string) error {
 	endpointPath := filepath.Join(s.cfg.EndpointsPath, name)
 
 	if _, err := os.Stat(endpointPath); os.IsNotExist(err) {
@@ -56,29 +57,29 @@ func (s *ActivationService) Activate(name string) error {
 		s.logSvc.Info("activation", fmt.Sprintf("Activated endpoint '%s'", name))
 	}
 
-	if s.cfg.PostActivationCommand != "" {
-		s.logSvc.Info("activation", fmt.Sprintf("Running post-activation command: %s", s.cfg.PostActivationCommand))
-		if err := s.runPostCommand(); err != nil {
-			s.logSvc.Error("activation", fmt.Sprintf("Post-activation command failed: %s", err.Error()))
-			return fmt.Errorf("activation successful but post-command failed: %w", err)
-		}
-		s.logSvc.Info("activation", "Post-activation command completed successfully")
-	}
-
-	// Publish activation event
+	// Publish activation event immediately (before starting post-activation command)
 	s.eventSvc.Publish(Event{
 		Type:    EventEndpointActivated,
 		Payload: map[string]string{"name": name, "previous": previousActive},
 	})
 
-	return nil
-}
+	// Determine which activation command to use: endpoint-specific or global default
+	command := activationCommand
+	if command == "" {
+		command = s.cfg.PostActivationCommand
+	}
 
-func (s *ActivationService) runPostCommand() error {
-	cmd := exec.Command("sh", "-c", s.cfg.PostActivationCommand)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	// Start post-activation command asynchronously if configured
+	if command != "" && s.processSvc != nil {
+		s.logSvc.Info("activation", fmt.Sprintf("Starting post-activation command: %s", command))
+		go func() {
+			if err := s.processSvc.StartProcess(name, command); err != nil {
+				s.logSvc.Error("activation", fmt.Sprintf("Failed to start post-activation command: %s", err.Error()))
+			}
+		}()
+	}
+
+	return nil
 }
 
 // backupExistingDirectory checks if ActiveSymlink path exists as a real directory (not a symlink)

@@ -24,10 +24,11 @@ type Handlers struct {
 	eventService      *services.EventService
 	authService       *services.AuthService
 	termService       *services.TerminalService
+	processService    *services.ProcessService
 	viewTemplates     map[string]*template.Template
 }
 
-func NewHandlers(cfg *config.Config, endpointSvc *services.EndpointService, activationSvc *services.ActivationService, commandSvc *services.CommandService, backupSvc *services.BackupService, logSvc *services.LogService, eventSvc *services.EventService, authSvc *services.AuthService, termSvc *services.TerminalService) (*Handlers, error) {
+func NewHandlers(cfg *config.Config, endpointSvc *services.EndpointService, activationSvc *services.ActivationService, commandSvc *services.CommandService, backupSvc *services.BackupService, logSvc *services.LogService, eventSvc *services.EventService, authSvc *services.AuthService, termSvc *services.TerminalService, processSvc *services.ProcessService) (*Handlers, error) {
 	// Shared template files
 	sharedFiles := []string{
 		"templates/base.html",
@@ -46,6 +47,7 @@ func NewHandlers(cfg *config.Config, endpointSvc *services.EndpointService, acti
 		"sync":      {"templates/sync.html", "templates/_help_sync.html"},
 		"terminal":  {"templates/terminal.html", "templates/_help_terminal.html"},
 		"backups":   {"templates/backups.html", "templates/_help_backups.html"},
+		"active":    {"templates/active.html", "templates/_help_active.html"},
 	}
 
 	viewTemplates := make(map[string]*template.Template)
@@ -70,6 +72,7 @@ func NewHandlers(cfg *config.Config, endpointSvc *services.EndpointService, acti
 		eventService:      eventSvc,
 		authService:       authSvc,
 		termService:       termSvc,
+		processService:    processSvc,
 		viewTemplates:     viewTemplates,
 	}, nil
 }
@@ -166,4 +169,10 @@ func (h *Handlers) SyncPage(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handlers) BackupsPage(w http.ResponseWriter, r *http.Request) {
 	h.renderPage(w, "backups", h.defaultPageData("backups", "Backups"))
+}
+
+func (h *Handlers) ActivePage(w http.ResponseWriter, r *http.Request) {
+	data := h.defaultPageData("active", "Active")
+	data.ActiveEndpoint = h.activationService.GetActive()
+	h.renderPage(w, "active", data)
 }

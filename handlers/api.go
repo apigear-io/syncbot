@@ -93,7 +93,10 @@ func (h *Handlers) DeleteEndpoint(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) ActivateEndpoint(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 
-	if err := h.activationService.Activate(name); err != nil {
+	// Get the endpoint-specific activation command (if any)
+	activationCommand := h.endpointService.GetActivationCommand(name)
+
+	if err := h.activationService.Activate(name, activationCommand); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -107,8 +110,9 @@ func (h *Handlers) ActivateEndpoint(w http.ResponseWriter, r *http.Request) {
 }
 
 type UpdateEndpointRequest struct {
-	Username      string `json:"username"`
-	BuildInfoPath string `json:"build_info_path"`
+	Username          string `json:"username"`
+	BuildInfoPath     string `json:"build_info_path"`
+	ActivationCommand string `json:"activation_command"`
 }
 
 type UpdateBuildInfoPathRequest struct {
@@ -129,7 +133,7 @@ func (h *Handlers) UpdateEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := h.endpointService.Update(name, req.Username, req.BuildInfoPath); err != nil {
+	if err := h.endpointService.Update(name, req.Username, req.BuildInfoPath, req.ActivationCommand); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -953,5 +957,39 @@ func (h *Handlers) DeleteBackup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// Process API handlers
+
+// GetProcess returns the current process state
+// GET /api/process
+func (h *Handlers) GetProcess(w http.ResponseWriter, r *http.Request) {
+	info := h.processService.GetProcessInfo()
+	writeJSON(w, http.StatusOK, info)
+}
+
+// KillProcess terminates the running process
+// POST /api/process/kill
+func (h *Handlers) KillProcess(w http.ResponseWriter, r *http.Request) {
+	if err := h.processService.KillProcess(); err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		return
+	}
+	info := h.processService.GetProcessInfo()
+	writeJSON(w, http.StatusOK, info)
+}
+
+// GetProcessOutput returns the buffered process output
+// GET /api/process/output
+func (h *Handlers) GetProcessOutput(w http.ResponseWriter, r *http.Request) {
+	output := h.processService.GetOutputBuffer()
+	writeJSON(w, http.StatusOK, map[string]string{"output": string(output)})
+}
+
+// ClearProcessOutput clears the process output buffer
+// DELETE /api/process/output
+func (h *Handlers) ClearProcessOutput(w http.ResponseWriter, r *http.Request) {
+	h.processService.ClearOutputBuffer()
 	w.WriteHeader(http.StatusNoContent)
 }

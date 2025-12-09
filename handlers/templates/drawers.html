@@ -99,6 +99,14 @@ device-02,http://192.168.1.101:8081,Secondary device,Room 102"></textarea>
           <br>Examples: <code>*.log</code>, <code>config/*.json</code>, <code>logs/**/*.txt</code>
         </div>
       </div>
+      <div class="mb-3">
+        <label class="form-label">Activation Command</label>
+        <textarea class="form-control font-monospace" id="edit-endpoint-activation-command" rows="4" placeholder="chmod a+x $HOME/app/run.sh&#10;cd $HOME/app&#10;./run.sh"></textarea>
+        <div class="form-text">
+          Custom command to run when this endpoint is activated. Leave empty to use the global default from Settings.
+          <br>Supports multiline scripts with bash syntax.
+        </div>
+      </div>
       <div class="d-grid gap-2">
         <button type="submit" class="btn btn-primary">Save Changes</button>
         <button type="button" class="btn btn-secondary" data-bs-dismiss="offcanvas">Cancel</button>

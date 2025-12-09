@@ -74,7 +74,8 @@ func runServer(cmd *cobra.Command, args []string) {
 	}
 
 	eventSvc := services.NewEventService(logSvc)
-	activationSvc := services.NewActivationService(cfg, logSvc, eventSvc)
+	processSvc := services.NewProcessService(cfg, logSvc, eventSvc)
+	activationSvc := services.NewActivationService(cfg, logSvc, eventSvc, processSvc)
 	endpointSvc := services.NewEndpointService(cfg, activationSvc, logSvc, eventSvc)
 	commandSvc := services.NewCommandService(cfg, logSvc, eventSvc, activationSvc)
 	backupSvc, err := services.NewBackupService(cfg, logSvc, eventSvc)
@@ -85,7 +86,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	authSvc := services.NewAuthService(cfg, logSvc)
 	termSvc := services.NewTerminalService(cfg, authSvc, logSvc)
 
-	h, err := handlers.NewHandlers(cfg, endpointSvc, activationSvc, commandSvc, backupSvc, logSvc, eventSvc, authSvc, termSvc)
+	h, err := handlers.NewHandlers(cfg, endpointSvc, activationSvc, commandSvc, backupSvc, logSvc, eventSvc, authSvc, termSvc, processSvc)
 	if err != nil {
 		logSvc.Error("startup", "Failed to initialize handlers: "+err.Error())
 		os.Exit(1)
@@ -101,6 +102,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	// Page routes
 	r.Get("/", h.Index)
 	r.Get("/endpoints", h.EndpointsPage)
+	r.Get("/active", h.ActivePage)
 	r.Get("/devices", h.DevicesPage)
 	r.Get("/commands", h.CommandsPage)
 	r.Get("/logs", h.LogsPage)
@@ -125,6 +127,12 @@ func runServer(cmd *cobra.Command, args []string) {
 		r.Get("/logs", h.GetLogs)
 		r.Delete("/logs", h.ClearLogs)
 		r.Get("/events", h.Events)
+
+		// Process routes
+		r.Get("/process", h.GetProcess)
+		r.Post("/process/kill", h.KillProcess)
+		r.Get("/process/output", h.GetProcessOutput)
+		r.Delete("/process/output", h.ClearProcessOutput)
 
 		// Command routes
 		r.Get("/commands", h.ListCommands)

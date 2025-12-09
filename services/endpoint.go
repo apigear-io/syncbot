@@ -93,13 +93,14 @@ func (s *EndpointService) Get(name string) (*models.Endpoint, error) {
 	activeEndpoint := s.activationService.GetActive()
 
 	return &models.Endpoint{
-		Name:            name,
-		Username:        metadata.Username,
-		CreatedAt:       metadata.CreatedAt,
-		LastActivatedAt: metadata.LastActivatedAt,
-		BuildInfoPath:   metadata.BuildInfoPath,
-		BackupPatterns:  metadata.BackupPatterns,
-		IsActive:        name == activeEndpoint,
+		Name:              name,
+		Username:          metadata.Username,
+		CreatedAt:         metadata.CreatedAt,
+		LastActivatedAt:   metadata.LastActivatedAt,
+		BuildInfoPath:     metadata.BuildInfoPath,
+		BackupPatterns:    metadata.BackupPatterns,
+		ActivationCommand: metadata.ActivationCommand,
+		IsActive:          name == activeEndpoint,
 	}, nil
 }
 
@@ -169,7 +170,7 @@ func (s *EndpointService) Create(name, username string) (*models.Endpoint, error
 	return endpoint, nil
 }
 
-func (s *EndpointService) Update(name, username, buildInfoPath string) error {
+func (s *EndpointService) Update(name, username, buildInfoPath, activationCommand string) error {
 	metadataPath := s.metadataPath(name)
 
 	data, err := os.ReadFile(metadataPath)
@@ -184,6 +185,7 @@ func (s *EndpointService) Update(name, username, buildInfoPath string) error {
 
 	metadata.Username = username
 	metadata.BuildInfoPath = buildInfoPath
+	metadata.ActivationCommand = activationCommand
 
 	updatedData, err := json.MarshalIndent(metadata, "", "  ")
 	if err != nil {
@@ -352,6 +354,15 @@ func (s *EndpointService) GetBackupPatterns(name string) ([]string, error) {
 	}
 
 	return metadata.BackupPatterns, nil
+}
+
+// GetActivationCommand returns the activation command for an endpoint (or empty string if not set)
+func (s *EndpointService) GetActivationCommand(name string) string {
+	endpoint, err := s.Get(name)
+	if err != nil {
+		return ""
+	}
+	return endpoint.ActivationCommand
 }
 
 // UpdateBackupPatterns updates the backup patterns for an endpoint

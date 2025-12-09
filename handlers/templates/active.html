@@ -1,0 +1,327 @@
+{{define "content"}}
+<!-- Status Card -->
+<div class="card mb-3">
+  <div class="card-body py-3">
+    <div class="row align-items-center">
+      <div class="col-auto">
+        <span class="bg-primary text-white avatar">
+          <i class="ti ti-database"></i>
+        </span>
+      </div>
+      <div class="col">
+        <div class="text-muted small">Active Endpoint</div>
+        <div class="fw-bold" id="active-endpoint-name">{{if .ActiveEndpoint}}{{.ActiveEndpoint}}{{else}}<span class="text-muted">None</span>{{end}}</div>
+      </div>
+      <div class="col-auto">
+        <span class="text-muted small">Process Status</span>
+        <div>
+          <span id="process-state-badge" class="badge bg-secondary">Idle</span>
+        </div>
+      </div>
+      <div class="col-auto">
+        <span class="text-muted small">Exit Code</span>
+        <div id="process-exit-code" class="fw-bold">-</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Log Sources Card -->
+<div class="card">
+  <div class="card-header">
+    <div class="d-flex justify-content-between align-items-center w-100">
+      <ul class="nav nav-tabs card-header-tabs" id="log-source-tabs">
+        <li class="nav-item">
+          <a class="nav-link active" data-bs-toggle="tab" href="#log-command">
+            <i class="ti ti-terminal me-1"></i>Command Output
+          </a>
+        </li>
+        <!-- Future tabs for syslog, etc. -->
+      </ul>
+      <div class="ms-auto d-flex align-items-center gap-2">
+        <div class="input-group input-group-sm" style="width: 200px;">
+          <span class="input-group-text"><i class="ti ti-search"></i></span>
+          <input type="text" class="form-control" id="log-filter" placeholder="Filter..." oninput="filterOutput()">
+          <button class="btn btn-outline-secondary" type="button" onclick="clearFilter()" title="Clear filter">
+            <i class="ti ti-x"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="tab-content">
+      <div class="tab-pane active show" id="log-command">
+        <pre id="output-display" class="m-0 p-3 bg-dark text-light" style="height: calc(100vh - 340px); overflow-y: auto; font-family: 'SF Mono', 'Monaco', 'Menlo', monospace; font-size: 13px; white-space: pre-wrap; word-wrap: break-word;"></pre>
+      </div>
+    </div>
+  </div>
+  <div class="card-footer">
+    <div class="d-flex justify-content-between align-items-center">
+      <span class="text-muted" id="output-info">No output</span>
+      <div class="d-flex align-items-center gap-3">
+        <div class="form-check mb-0">
+          <input class="form-check-input" type="checkbox" id="auto-scroll" checked>
+          <label class="form-check-label" for="auto-scroll">Auto-scroll</label>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "page-actions"}}
+<button class="btn btn-danger" id="kill-btn" onclick="killProcess()" disabled>
+  <i class="ti ti-player-stop"></i>
+  Kill
+</button>
+<button class="btn btn-secondary" onclick="downloadLog()">
+  <i class="ti ti-download"></i>
+  Download
+</button>
+<button class="btn btn-secondary" onclick="clearOutput()">
+  <i class="ti ti-eraser"></i>
+  Clear
+</button>
+{{end}}
+
+{{define "view-js"}}
+let processState = 'idle';
+let lineCount = 0;
+let rawOutput = '';  // Store raw output for filtering
+
+// Load initial state on page load
+document.addEventListener('DOMContentLoaded', async function() {
+  await loadProcessState();
+  await loadBufferedOutput();
+});
+
+async function loadProcessState() {
+  try {
+    const response = await fetch('/api/process');
+    const info = await response.json();
+    updateProcessState(info);
+  } catch (error) {
+    console.error('Failed to load process state:', error);
+  }
+}
+
+async function loadBufferedOutput() {
+  try {
+    const response = await fetch('/api/process/output');
+    const data = await response.json();
+    if (data.output) {
+      appendOutput(data.output);
+    }
+  } catch (error) {
+    console.error('Failed to load buffered output:', error);
+  }
+}
+
+function updateProcessState(info) {
+  processState = info.state;
+  const badge = document.getElementById('process-state-badge');
+  const killBtn = document.getElementById('kill-btn');
+  const exitCodeEl = document.getElementById('process-exit-code');
+  const endpointEl = document.getElementById('active-endpoint-name');
+
+  // Update endpoint name if available from process info
+  if (info.endpoint_name) {
+    endpointEl.textContent = info.endpoint_name;
+  }
+
+  // Update state badge
+  switch (info.state) {
+    case 'running':
+      badge.className = 'badge bg-success text-white';
+      badge.innerHTML = '<span class="spinner-border spinner-border-sm me-1" style="width: 0.75rem; height: 0.75rem;"></span>Running';
+      killBtn.disabled = false;
+      break;
+    case 'stopped':
+      badge.className = 'badge bg-secondary text-white';
+      badge.textContent = 'Stopped';
+      killBtn.disabled = true;
+      break;
+    case 'killed':
+      badge.className = 'badge bg-warning text-dark';
+      badge.textContent = 'Killed';
+      killBtn.disabled = true;
+      break;
+    case 'failed':
+      badge.className = 'badge bg-danger text-white';
+      badge.textContent = 'Failed';
+      killBtn.disabled = true;
+      break;
+    default:
+      badge.className = 'badge bg-secondary text-white';
+      badge.textContent = 'Idle';
+      killBtn.disabled = true;
+  }
+
+  // Update exit code
+  if (info.exit_code !== undefined && info.exit_code !== null) {
+    exitCodeEl.textContent = info.exit_code;
+    if (info.exit_code === 0) {
+      exitCodeEl.className = 'fw-bold text-success';
+    } else {
+      exitCodeEl.className = 'fw-bold text-danger';
+    }
+  } else {
+    exitCodeEl.textContent = '-';
+    exitCodeEl.className = 'fw-bold';
+  }
+}
+
+function appendOutput(content) {
+  const display = document.getElementById('output-display');
+  const autoScroll = document.getElementById('auto-scroll').checked;
+  const filterText = document.getElementById('log-filter').value.toLowerCase();
+
+  // Store raw output
+  rawOutput += content;
+
+  // Apply filter if set
+  if (filterText) {
+    const filteredLines = rawOutput.split('\n').filter(line =>
+      line.toLowerCase().includes(filterText)
+    );
+    display.textContent = filteredLines.join('\n');
+    lineCount = filteredLines.length;
+  } else {
+    display.textContent = rawOutput;
+    lineCount = (rawOutput.match(/\n/g) || []).length;
+  }
+
+  updateOutputInfo();
+
+  // Auto-scroll if enabled
+  if (autoScroll) {
+    display.scrollTop = display.scrollHeight;
+  }
+}
+
+function updateOutputInfo() {
+  const info = document.getElementById('output-info');
+  const filterText = document.getElementById('log-filter').value;
+  const totalLines = (rawOutput.match(/\n/g) || []).length;
+
+  if (totalLines === 0) {
+    info.textContent = 'No output';
+  } else if (filterText) {
+    info.textContent = `${lineCount} of ${totalLines} lines (filtered)`;
+  } else {
+    info.textContent = `${totalLines} lines`;
+  }
+}
+
+async function killProcess() {
+  try {
+    const response = await fetch('/api/process/kill', { method: 'POST' });
+    const info = await response.json();
+    updateProcessState(info);
+    showToast('Process Killed', 'The process has been terminated', 'warning');
+  } catch (error) {
+    showToast('Error', 'Failed to kill process: ' + error.message, 'danger');
+  }
+}
+
+async function clearOutput() {
+  try {
+    await fetch('/api/process/output', { method: 'DELETE' });
+    document.getElementById('output-display').textContent = '';
+    rawOutput = '';
+    lineCount = 0;
+    updateOutputInfo();
+    showToast('Cleared', 'Output buffer cleared', 'info');
+  } catch (error) {
+    showToast('Error', 'Failed to clear output: ' + error.message, 'danger');
+  }
+}
+
+// Handle process events from SSE (defined in shared_js.html)
+function handleProcessStarted(payload) {
+  updateProcessState({
+    state: 'running',
+    endpoint_name: payload.endpoint_name
+  });
+  // Clear previous output when new process starts
+  document.getElementById('output-display').textContent = '';
+  rawOutput = '';
+  lineCount = 0;
+  updateOutputInfo();
+}
+
+function handleProcessOutput(payload) {
+  appendOutput(payload.content);
+}
+
+function handleProcessStopped(payload) {
+  updateProcessState({
+    state: payload.state,
+    exit_code: payload.exit_code,
+    endpoint_name: payload.endpoint_name
+  });
+}
+
+// Filter functions
+function filterOutput() {
+  const display = document.getElementById('output-display');
+  const filterText = document.getElementById('log-filter').value.toLowerCase();
+
+  if (filterText) {
+    const filteredLines = rawOutput.split('\n').filter(line =>
+      line.toLowerCase().includes(filterText)
+    );
+    display.textContent = filteredLines.join('\n');
+    lineCount = filteredLines.length;
+  } else {
+    display.textContent = rawOutput;
+    lineCount = (rawOutput.match(/\n/g) || []).length;
+  }
+
+  updateOutputInfo();
+}
+
+function clearFilter() {
+  document.getElementById('log-filter').value = '';
+  filterOutput();
+}
+
+// Download function
+function downloadLog() {
+  if (!rawOutput) {
+    showToast('Info', 'No output to download', 'info');
+    return;
+  }
+
+  const filterText = document.getElementById('log-filter').value;
+  let content = rawOutput;
+  let filename = 'activation-log';
+
+  // Download filtered content if filter is active
+  if (filterText) {
+    const filteredLines = rawOutput.split('\n').filter(line =>
+      line.toLowerCase().includes(filterText.toLowerCase())
+    );
+    content = filteredLines.join('\n');
+    filename += '-filtered';
+  }
+
+  // Add timestamp to filename
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  filename += `-${timestamp}.txt`;
+
+  // Create and trigger download
+  const blob = new Blob([content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showToast('Downloaded', `Log saved as ${filename}`, 'success');
+}
+{{end}}

@@ -54,6 +54,40 @@ function connectSSE() {
     showToast('Endpoint Deleted', `"${data.payload.name}" was deleted`, 'info');
   });
 
+  // Process events for Active page
+  eventSource.addEventListener('process_started', function(e) {
+    const data = JSON.parse(e.data);
+    console.log('Process started:', data.payload);
+    if (activeView === 'active' && typeof handleProcessStarted === 'function') {
+      handleProcessStarted(data.payload);
+    }
+    showToast('Process Started', `Command started for "${data.payload.endpoint_name}"`, 'info');
+  });
+
+  eventSource.addEventListener('process_output', function(e) {
+    const data = JSON.parse(e.data);
+    if (activeView === 'active' && typeof handleProcessOutput === 'function') {
+      handleProcessOutput(data.payload);
+    }
+  });
+
+  eventSource.addEventListener('process_stopped', function(e) {
+    const data = JSON.parse(e.data);
+    console.log('Process stopped:', data.payload);
+    if (activeView === 'active' && typeof handleProcessStopped === 'function') {
+      handleProcessStopped(data.payload);
+    }
+    const exitCode = data.payload.exit_code;
+    const state = data.payload.state;
+    if (state === 'killed') {
+      showToast('Process Killed', 'The process was terminated', 'warning');
+    } else if (exitCode === 0) {
+      showToast('Process Completed', 'Command finished successfully', 'success');
+    } else {
+      showToast('Process Stopped', `Command exited with code ${exitCode}`, 'warning');
+    }
+  });
+
   eventSource.onerror = function(e) {
     console.log('SSE error, reconnecting in 5s...');
     eventSource.close();
@@ -131,12 +165,13 @@ function copyToClipboard(text) {
 }
 
 // Edit endpoint functions
-async function showEditEndpointDrawer(name, owner, buildInfoPath) {
+async function showEditEndpointDrawer(name, owner, buildInfoPath, activationCommand) {
   document.getElementById('edit-endpoint-name').value = name;
   document.getElementById('edit-endpoint-name-title').textContent = name;
   document.getElementById('edit-endpoint-owner').value = owner;
   document.getElementById('edit-endpoint-build-info-path').value = buildInfoPath || '';
   document.getElementById('edit-endpoint-backup-patterns').value = '';
+  document.getElementById('edit-endpoint-activation-command').value = activationCommand || '';
 
   // Load backup patterns
   try {
@@ -158,6 +193,7 @@ document.getElementById('edit-endpoint-form').addEventListener('submit', async (
   const name = document.getElementById('edit-endpoint-name').value;
   const username = document.getElementById('edit-endpoint-owner').value.trim();
   const buildInfoPath = document.getElementById('edit-endpoint-build-info-path').value.trim();
+  const activationCommand = document.getElementById('edit-endpoint-activation-command').value;
   const backupPatternsText = document.getElementById('edit-endpoint-backup-patterns').value;
   const backupPatterns = backupPatternsText.split('\n').map(p => p.trim()).filter(p => p);
 
@@ -166,7 +202,7 @@ document.getElementById('edit-endpoint-form').addEventListener('submit', async (
     const response = await fetch(`/api/endpoints/${encodeURIComponent(name)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, build_info_path: buildInfoPath })
+      body: JSON.stringify({ username, build_info_path: buildInfoPath, activation_command: activationCommand })
     });
 
     const data = await response.json();
@@ -278,10 +314,8 @@ async function confirmActivation() {
       return;
     }
 
-    showToast('Success', `Endpoint "${pendingActivateEndpoint}" activated`, 'success');
-    if (typeof loadEndpoints === 'function') {
-      loadEndpoints();
-    }
+    // Redirect to Active page to see the command output
+    window.location.href = '/active';
   } catch (error) {
     showToast('Error', 'Failed to activate endpoint', 'danger');
   }

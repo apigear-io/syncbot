@@ -1,0 +1,34 @@
+{{define "view-help"}}
+<h5>Active Endpoint</h5>
+<p>This page shows the currently active endpoint and the output from the post-activation command.</p>
+
+<h6>Process Status</h6>
+<ul>
+  <li><strong>Idle</strong> - No process has run yet</li>
+  <li><strong>Running</strong> - Post-activation command is executing</li>
+  <li><strong>Stopped</strong> - Process exited normally</li>
+  <li><strong>Killed</strong> - Process was terminated by user or new activation</li>
+  <li><strong>Failed</strong> - Process failed to start</li>
+</ul>
+
+<h6>Controls</h6>
+<ul>
+  <li><strong>Kill</strong> - Stop the running process (sends SIGTERM, then SIGKILL)</li>
+  <li><strong>Clear</strong> - Clear the output buffer</li>
+  <li><strong>Auto-scroll</strong> - Automatically scroll to new output</li>
+</ul>
+
+<h6>How It Works</h6>
+<p>When you activate an endpoint, the post-activation command (configured in Settings) runs in the background.
+The output streams here in real-time via Server-Sent Events (SSE).</p>
+
+<p>If you activate a new endpoint while a command is still running, the previous command is automatically killed.</p>
+
+<h6>Future Log Sources</h6>
+<p>This page is designed to support multiple log sources. Future versions may include:</p>
+<ul>
+  <li>System logs (syslog, journalctl)</li>
+  <li>Application-specific log files</li>
+  <li>Custom log streams</li>
+</ul>
+{{end}}

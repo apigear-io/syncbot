@@ -3,21 +3,23 @@ package models
 import "time"
 
 type Endpoint struct {
-	Name            string     `json:"name"`
-	Username        string     `json:"username"`
-	CreatedAt       time.Time  `json:"created_at"`
-	LastActivatedAt *time.Time `json:"last_activated_at,omitempty"`
-	BuildInfoPath   string     `json:"build_info_path,omitempty"`
-	BackupPatterns  []string   `json:"backup_patterns,omitempty"`
-	IsActive        bool       `json:"is_active"`
+	Name              string     `json:"name"`
+	Username          string     `json:"username"`
+	CreatedAt         time.Time  `json:"created_at"`
+	LastActivatedAt   *time.Time `json:"last_activated_at,omitempty"`
+	BuildInfoPath     string     `json:"build_info_path,omitempty"`
+	BackupPatterns    []string   `json:"backup_patterns,omitempty"`
+	ActivationCommand string     `json:"activation_command,omitempty"`
+	IsActive          bool       `json:"is_active"`
 }
 
 type EndpointMetadata struct {
-	Username        string     `json:"username"`
-	CreatedAt       time.Time  `json:"created_at"`
-	LastActivatedAt *time.Time `json:"last_activated_at,omitempty"`
-	BuildInfoPath   string     `json:"build_info_path,omitempty"`
-	BackupPatterns  []string   `json:"backup_patterns,omitempty"`
+	Username          string     `json:"username"`
+	CreatedAt         time.Time  `json:"created_at"`
+	LastActivatedAt   *time.Time `json:"last_activated_at,omitempty"`
+	BuildInfoPath     string     `json:"build_info_path,omitempty"`
+	BackupPatterns    []string   `json:"backup_patterns,omitempty"`
+	ActivationCommand string     `json:"activation_command,omitempty"`
 }
 
 // BackupResult represents the result of a backup operation

@@ -74,9 +74,12 @@
         </div>
         <div class="row">
           <div class="col-12 mb-3">
-            <label class="form-label">Post-Activation Command</label>
-            <input type="text" class="form-control" id="settings-post-command" value="{{.PostActivationCommand}}" placeholder="sudo systemctl restart myservice">
-            <div class="form-text">Shell command to run after activating an endpoint (leave empty for none)</div>
+            <label class="form-label">Post-Activation Command (Default)</label>
+            <textarea class="form-control font-monospace" id="settings-post-command" rows="4" placeholder="chmod a+x $HOME/app/run.sh&#10;cd $HOME/app&#10;./run.sh">{{.PostActivationCommand}}</textarea>
+            <div class="form-text">
+              Default shell command to run after activating an endpoint. Supports multiline scripts with bash syntax.
+              <br>Endpoints can override this with their own activation command.
+            </div>
           </div>
         </div>
       </div>

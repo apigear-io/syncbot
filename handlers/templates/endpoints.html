@@ -26,22 +26,27 @@
 <!-- Active Endpoint Card -->
 <div class="row mb-4">
   <div class="col-12">
-    <div class="card" id="active-card">
-      <div class="card-header">
-        <h3 class="card-title">Active Endpoint</h3>
-      </div>
-      <div class="card-body">
-        {{if .ActiveEndpoint}}
-        <div class="d-flex align-items-center">
-          <span class="badge bg-success me-2">Active</span>
-          <strong class="me-2">{{.ActiveEndpoint}}</strong>
-          {{range .Endpoints}}{{if .IsActive}}<span class="text-muted">owned by {{.Username}}</span>{{end}}{{end}}
+    <a href="/active" class="text-decoration-none">
+      <div class="card" id="active-card" style="cursor: pointer;">
+        <div class="card-header">
+          <h3 class="card-title">Active Endpoint</h3>
+          <div class="card-actions">
+            <span class="text-muted small">View logs <i class="ti ti-chevron-right"></i></span>
+          </div>
         </div>
-        {{else}}
-        <span class="text-muted">No active endpoint</span>
-        {{end}}
+        <div class="card-body">
+          {{if .ActiveEndpoint}}
+          <div class="d-flex align-items-center">
+            <span class="badge bg-success me-2">Active</span>
+            <strong class="me-2 text-body">{{.ActiveEndpoint}}</strong>
+            {{range .Endpoints}}{{if .IsActive}}<span class="text-muted">owned by {{.Username}}</span>{{end}}{{end}}
+          </div>
+          {{else}}
+          <span class="text-muted">No active endpoint</span>
+          {{end}}
+        </div>
       </div>
-    </div>
+    </a>
   </div>
 </div>
 
@@ -79,7 +84,7 @@
                     <button class="btn btn-sm btn-secondary" onclick="showRsyncModal('{{.Name}}')">rsync</button>
                     <button class="btn btn-sm btn-primary" onclick="showBackupModal('{{.Name}}')" title="Backup"><i class="ti ti-archive"></i></button>
                     <button class="btn btn-sm btn-info" onclick="showBuildInfoModal('{{.Name}}', '{{.BuildInfoPath}}')" title="Build Info"><i class="ti ti-info-circle"></i></button>
-                    <button class="btn btn-sm btn-warning" onclick="showEditEndpointDrawer('{{.Name}}', '{{.Username}}', '{{.BuildInfoPath}}')" title="Edit"><i class="ti ti-edit"></i></button>
+                    <button class="btn btn-sm btn-warning" onclick="showEditEndpointDrawer('{{.Name}}', '{{.Username}}', '{{.BuildInfoPath}}', `{{.ActivationCommand}}`)" title="Edit"><i class="ti ti-edit"></i></button>
                     <button class="btn btn-sm btn-danger" onclick="showDeleteModal('{{.Name}}')" {{if .IsActive}}disabled{{end}}>Delete</button>
                   </div>
                 </td>

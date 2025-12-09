@@ -4,7 +4,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SyncBot - {{.Title}}</title>
+  <title>{{.DeviceName}} - {{.Title}}</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230d6efd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4'/><path d='M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4'/></svg>">
   <link rel="stylesheet" href="/static/css/tabler.min.css">
   <link rel="stylesheet" href="/static/css/tabler-icons.min.css">
   <style>
@@ -25,7 +26,10 @@
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="navbar-brand w-100 text-center py-3 d-flex flex-column align-items-center">
-          <div class="text-white fs-3 fw-bold">SyncBot</div>
+          <div class="text-white fs-3 fw-bold d-flex align-items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11A8.1 8.1 0 0 0 4.5 9M4 5v4h4"/><path d="M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4"/></svg>
+            SyncBot
+          </div>
           <div class="text-white-50 small mt-1">{{.DeviceName}}</div>
         </div>
         <div class="collapse navbar-collapse" id="navbar-menu">
@@ -35,6 +39,12 @@
               <a class="nav-link{{if eq .ActiveView "endpoints"}} active{{end}}" href="/endpoints">
                 <span class="nav-link-icon"><i class="ti ti-database"></i></span>
                 <span class="nav-link-title">Endpoints</span>
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link{{if eq .ActiveView "active"}} active{{end}}" href="/active">
+                <span class="nav-link-icon"><i class="ti ti-player-play"></i></span>
+                <span class="nav-link-title">Active</span>
               </a>
             </li>
             <li class="nav-item">

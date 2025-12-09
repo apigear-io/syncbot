@@ -15,6 +15,9 @@ const (
 	EventCommandCreated    EventType = "command_created"
 	EventCommandDeleted    EventType = "command_deleted"
 	EventCommandExecuted   EventType = "command_executed"
+	EventProcessStarted    EventType = "process_started"
+	EventProcessOutput     EventType = "process_output"
+	EventProcessStopped    EventType = "process_stopped"
 )
 
 type Event struct {
