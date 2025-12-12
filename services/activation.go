@@ -27,7 +27,7 @@ func (s *ActivationService) GetActive() string {
 	return filepath.Base(target)
 }
 
-// Activate activates an endpoint. If activationCommand is empty, uses the global default.
+// Activate activates an endpoint. If activationCommand is empty, no command is run.
 func (s *ActivationService) Activate(name string, activationCommand string) error {
 	endpointPath := filepath.Join(s.cfg.EndpointsPath, name)
 
@@ -63,17 +63,12 @@ func (s *ActivationService) Activate(name string, activationCommand string) erro
 		Payload: map[string]string{"name": name, "previous": previousActive},
 	})
 
-	// Determine which activation command to use: endpoint-specific or global default
-	command := activationCommand
-	if command == "" {
-		command = s.cfg.PostActivationCommand
-	}
-
-	// Start post-activation command asynchronously if configured
-	if command != "" && s.processSvc != nil {
-		s.logSvc.Info("activation", fmt.Sprintf("Starting post-activation command: %s", command))
+	// Start post-activation command asynchronously if provided
+	// Note: The caller is responsible for determining the command (profile, endpoint-specific, or empty)
+	if activationCommand != "" && s.processSvc != nil {
+		s.logSvc.Info("activation", fmt.Sprintf("Starting post-activation command: %s", activationCommand))
 		go func() {
-			if err := s.processSvc.StartProcess(name, command); err != nil {
+			if err := s.processSvc.StartProcess(name, activationCommand); err != nil {
 				s.logSvc.Error("activation", fmt.Sprintf("Failed to start post-activation command: %s", err.Error()))
 			}
 		}()

@@ -26,17 +26,33 @@
 
 <!-- Activation Confirmation Modal -->
 <div class="modal modal-blur fade" id="activate-modal" tabindex="-1">
-  <div class="modal-dialog modal-sm modal-dialog-centered">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content" data-bs-theme="light">
       <div class="modal-status bg-warning"></div>
       <div class="modal-body text-center py-4">
         <i class="ti ti-alert-triangle icon-lg text-warning mb-2"></i>
         <h3 class="text-dark">Activate Endpoint</h3>
         <p class="text-secondary">Activate <strong id="activate-endpoint-name"></strong>?</p>
+
+        <!-- Profile Selection (shown when profiles exist and no endpoint-specific command) -->
+        <div class="text-start mt-3" id="activate-profile-section" style="display: none;">
+          <label class="form-label text-muted">Activation Profile:</label>
+          <select class="form-select" id="activate-profile-select" onchange="updateActivateCommandPreview()">
+            <!-- Options populated by JavaScript -->
+          </select>
+        </div>
+
+        <!-- Command Preview -->
         <div class="text-start mt-3" id="activate-command-section">
           <label class="form-label text-muted">Post-activation command:</label>
-          <pre class="p-2 rounded mb-0" style="background-color: #1e293b;"><code id="activate-command-display" style="color: #e2e8f0;"></code></pre>
+          <pre class="p-2 rounded mb-0" style="background-color: #1e293b; max-height: 150px; overflow-y: auto;"><code id="activate-command-display" style="color: #e2e8f0;"></code></pre>
         </div>
+
+        <!-- Endpoint-specific command note -->
+        <div id="activate-endpoint-command-note" class="text-muted mt-2 small" style="display: none;">
+          <em><i class="ti ti-info-circle"></i> Using endpoint-specific command</em>
+        </div>
+
         <div id="activate-no-command" class="text-muted mt-2" style="display: none;">
           <em>No post-activation command configured</em>
         </div>

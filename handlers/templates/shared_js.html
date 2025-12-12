@@ -11,9 +11,23 @@ let devices = [];
 let currentRsyncEndpoint = "";
 let deleteEndpointName = "";
 let pendingActivateEndpoint = "";
+let pendingActivateEndpointCommand = ""; // Endpoint-specific command (if any)
 let pendingRemoveDeviceIndex = -1;
 const activeView = "{{.ActiveView}}";
 let eventSource = null;
+
+// Activation profiles (populated from page data)
+let activationProfiles = [];
+(function() {
+  const profilesJson = '{{range $i, $p := .ActivationProfiles}}{{if $i}},{{end}}{"id":"{{$p.ID}}","name":"{{$p.Name}}","command":"{{js $p.Command}}"}{{end}}';
+  if (profilesJson) {
+    try {
+      activationProfiles = JSON.parse('[' + profilesJson + ']');
+    } catch (e) {
+      activationProfiles = [];
+    }
+  }
+})();
 
 // SSE connection for real-time updates
 function connectSSE() {
@@ -282,20 +296,77 @@ async function loadBuildInfo(name, currentPath) {
 }
 
 // Activation functions
-function activateEndpoint(name) {
+function activateEndpoint(name, endpointCommand) {
   pendingActivateEndpoint = name;
+  pendingActivateEndpointCommand = endpointCommand || '';
   document.getElementById('activate-endpoint-name').textContent = name;
 
-  if (postActivationCommand) {
-    document.getElementById('activate-command-section').style.display = 'block';
-    document.getElementById('activate-no-command').style.display = 'none';
-    document.getElementById('activate-command-display').textContent = postActivationCommand;
+  const profileSection = document.getElementById('activate-profile-section');
+  const commandSection = document.getElementById('activate-command-section');
+  const noCommandEl = document.getElementById('activate-no-command');
+  const endpointNoteEl = document.getElementById('activate-endpoint-command-note');
+  const commandDisplay = document.getElementById('activate-command-display');
+  const profileSelect = document.getElementById('activate-profile-select');
+
+  // Reset visibility
+  profileSection.style.display = 'none';
+  commandSection.style.display = 'none';
+  noCommandEl.style.display = 'none';
+  endpointNoteEl.style.display = 'none';
+
+  // If endpoint has its own command, use it (no profile selection)
+  if (endpointCommand) {
+    commandSection.style.display = 'block';
+    commandDisplay.textContent = endpointCommand;
+    endpointNoteEl.style.display = 'block';
+  }
+  // If we have profiles, show the dropdown
+  else if (activationProfiles.length > 0) {
+    profileSection.style.display = 'block';
+
+    // Populate the dropdown
+    profileSelect.innerHTML = activationProfiles.map((p, i) =>
+      `<option value="${escapeHtml(p.id)}" ${i === 0 ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
+    ).join('') + '<option value="">No command</option>';
+
+    // Restore last used profile for this endpoint
+    const lastProfile = localStorage.getItem(`syncbot-profile-${name}`);
+    if (lastProfile && activationProfiles.some(p => p.id === lastProfile)) {
+      profileSelect.value = lastProfile;
+    }
+
+    // Show command preview
+    updateActivateCommandPreview();
+  }
+  // No profiles and no endpoint command
+  else if (postActivationCommand) {
+    // Legacy: use the deprecated single command
+    commandSection.style.display = 'block';
+    commandDisplay.textContent = postActivationCommand;
   } else {
-    document.getElementById('activate-command-section').style.display = 'none';
-    document.getElementById('activate-no-command').style.display = 'block';
+    noCommandEl.style.display = 'block';
   }
 
   new bootstrap.Modal(document.getElementById('activate-modal')).show();
+}
+
+function updateActivateCommandPreview() {
+  const profileSelect = document.getElementById('activate-profile-select');
+  const commandSection = document.getElementById('activate-command-section');
+  const noCommandEl = document.getElementById('activate-no-command');
+  const commandDisplay = document.getElementById('activate-command-display');
+
+  const selectedId = profileSelect.value;
+  const profile = activationProfiles.find(p => p.id === selectedId);
+
+  if (profile && profile.command) {
+    commandSection.style.display = 'block';
+    noCommandEl.style.display = 'none';
+    commandDisplay.textContent = profile.command;
+  } else {
+    commandSection.style.display = 'none';
+    noCommandEl.style.display = 'block';
+  }
 }
 
 async function confirmActivation() {
@@ -303,8 +374,21 @@ async function confirmActivation() {
   modal.hide();
 
   try {
+    // Build request body with profile ID if applicable
+    const body = {};
+    const profileSelect = document.getElementById('activate-profile-select');
+
+    // Only send profile_id if we're using profiles (not endpoint-specific command)
+    if (!pendingActivateEndpointCommand && profileSelect && profileSelect.value) {
+      body.profile_id = profileSelect.value;
+      // Remember the selection for this endpoint
+      localStorage.setItem(`syncbot-profile-${pendingActivateEndpoint}`, profileSelect.value);
+    }
+
     const response = await fetch(`/api/endpoints/${encodeURIComponent(pendingActivateEndpoint)}/activate`, {
-      method: 'POST'
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
     });
 
     const data = await response.json();

@@ -91,11 +91,42 @@ func (h *Handlers) DeleteEndpoint(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+type ActivateEndpointRequest struct {
+	ProfileID *string `json:"profile_id"` // Pointer to distinguish between null/missing and empty string
+}
+
 func (h *Handlers) ActivateEndpoint(w http.ResponseWriter, r *http.Request) {
 	name := chi.URLParam(r, "name")
 
-	// Get the endpoint-specific activation command (if any)
+	// Parse request body for profile selection (optional)
+	var req ActivateEndpointRequest
+	if r.Body != nil && r.ContentLength > 0 {
+		json.NewDecoder(r.Body).Decode(&req)
+	}
+
+	// Determine which activation command to use:
+	// 1. Endpoint-specific command (if set)
+	// 2. Selected profile command (if profile_id provided and not empty)
+	// 3. No command (if profile_id is explicitly empty string)
+	// 4. Default profile command (if profile_id is null/not provided)
 	activationCommand := h.endpointService.GetActivationCommand(name)
+
+	if activationCommand == "" {
+		if req.ProfileID != nil {
+			if *req.ProfileID != "" {
+				// Use selected profile
+				if profile := h.config.GetActivationProfile(*req.ProfileID); profile != nil {
+					activationCommand = profile.Command
+				}
+			}
+			// If ProfileID is explicitly empty string "", activationCommand stays empty (no command)
+		} else {
+			// ProfileID not provided - use default profile
+			if profile := h.config.GetDefaultActivationProfile(); profile != nil {
+				activationCommand = profile.Command
+			}
+		}
+	}
 
 	if err := h.activationService.Activate(name, activationCommand); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorResponse{Error: err.Error()})
@@ -185,31 +216,37 @@ func (h *Handlers) GetConfig(w http.ResponseWriter, r *http.Request) {
 }
 
 type SettingsResponse struct {
-	DeviceName            string          `json:"device_name"`
-	DeviceDescription     string          `json:"device_description"`
-	DeviceLocation        string          `json:"device_location"`
-	EndpointsPath         string          `json:"endpoints_path"`
-	ActiveSymlink         string          `json:"active_symlink"`
-	PostActivationCommand string          `json:"post_activation_command"`
-	Port                  int             `json:"port"`
-	DeviceIP              string          `json:"device_ip"`
-	SSHUsername           string          `json:"ssh_username"`
-	Devices               []config.Device `json:"devices"`
+	DeviceName            string                    `json:"device_name"`
+	DeviceDescription     string                    `json:"device_description"`
+	DeviceLocation        string                    `json:"device_location"`
+	EndpointsPath         string                    `json:"endpoints_path"`
+	ActiveSymlink         string                    `json:"active_symlink"`
+	PostActivationCommand string                    `json:"post_activation_command"` // Deprecated
+	ActivationProfiles    []config.ActivationProfile `json:"activation_profiles"`
+	Port                  int                       `json:"port"`
+	DeviceIP              string                    `json:"device_ip"`
+	SSHUsername           string                    `json:"ssh_username"`
+	Devices               []config.Device           `json:"devices"`
 }
 
 type UpdateSettingsRequest struct {
-	DeviceName            string          `json:"device_name"`
-	DeviceDescription     string          `json:"device_description"`
-	DeviceLocation        string          `json:"device_location"`
-	EndpointsPath         string          `json:"endpoints_path"`
-	ActiveSymlink         string          `json:"active_symlink"`
-	PostActivationCommand string          `json:"post_activation_command"`
-	DeviceIP              string          `json:"device_ip"`
-	SSHUsername           string          `json:"ssh_username"`
-	Devices               []config.Device `json:"devices"`
+	DeviceName            string                    `json:"device_name"`
+	DeviceDescription     string                    `json:"device_description"`
+	DeviceLocation        string                    `json:"device_location"`
+	EndpointsPath         string                    `json:"endpoints_path"`
+	ActiveSymlink         string                    `json:"active_symlink"`
+	PostActivationCommand string                    `json:"post_activation_command"` // Deprecated
+	ActivationProfiles    []config.ActivationProfile `json:"activation_profiles"`
+	DeviceIP              string                    `json:"device_ip"`
+	SSHUsername           string                    `json:"ssh_username"`
+	Devices               []config.Device           `json:"devices"`
 }
 
 func (h *Handlers) GetSettings(w http.ResponseWriter, r *http.Request) {
+	profiles := h.config.ActivationProfiles
+	if profiles == nil {
+		profiles = []config.ActivationProfile{}
+	}
 	writeJSON(w, http.StatusOK, SettingsResponse{
 		DeviceName:            h.config.DeviceName,
 		DeviceDescription:     h.config.DeviceDescription,
@@ -217,6 +254,7 @@ func (h *Handlers) GetSettings(w http.ResponseWriter, r *http.Request) {
 		EndpointsPath:         h.config.EndpointsPath,
 		ActiveSymlink:         h.config.ActiveSymlink,
 		PostActivationCommand: h.config.PostActivationCommand,
+		ActivationProfiles:    profiles,
 		Port:                  h.config.Port,
 		DeviceIP:              h.config.DeviceIP,
 		SSHUsername:           h.config.SSHUsername,
@@ -262,12 +300,27 @@ func (h *Handlers) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		h.config.Devices = req.Devices
 	}
 
+	// Update activation profiles
+	if req.ActivationProfiles != nil {
+		// Auto-generate IDs for profiles that don't have one
+		for i := range req.ActivationProfiles {
+			if req.ActivationProfiles[i].ID == "" {
+				req.ActivationProfiles[i].ID = generateProfileID(req.ActivationProfiles[i].Name, req.ActivationProfiles, i)
+			}
+		}
+		h.config.ActivationProfiles = req.ActivationProfiles
+	}
+
 	// Save to file
 	if err := h.config.Save(); err != nil {
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: "failed to save settings: " + err.Error()})
 		return
 	}
 
+	profiles := h.config.ActivationProfiles
+	if profiles == nil {
+		profiles = []config.ActivationProfile{}
+	}
 	writeJSON(w, http.StatusOK, SettingsResponse{
 		DeviceName:            h.config.DeviceName,
 		DeviceDescription:     h.config.DeviceDescription,
@@ -275,6 +328,7 @@ func (h *Handlers) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		EndpointsPath:         h.config.EndpointsPath,
 		ActiveSymlink:         h.config.ActiveSymlink,
 		PostActivationCommand: h.config.PostActivationCommand,
+		ActivationProfiles:    profiles,
 		Port:                  h.config.Port,
 		DeviceIP:              h.config.DeviceIP,
 		SSHUsername:           h.config.SSHUsername,
@@ -286,6 +340,53 @@ func writeJSON(w http.ResponseWriter, status int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(data)
+}
+
+// generateProfileID creates a slug from the profile name, ensuring uniqueness
+func generateProfileID(name string, profiles []config.ActivationProfile, currentIndex int) string {
+	// Create slug from name: lowercase, replace spaces with hyphens, remove special chars
+	slug := strings.ToLower(strings.TrimSpace(name))
+	slug = strings.ReplaceAll(slug, " ", "-")
+
+	// Remove any characters that aren't alphanumeric or hyphens
+	var result strings.Builder
+	for _, r := range slug {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '-' {
+			result.WriteRune(r)
+		}
+	}
+	slug = result.String()
+
+	// Collapse multiple hyphens and trim
+	for strings.Contains(slug, "--") {
+		slug = strings.ReplaceAll(slug, "--", "-")
+	}
+	slug = strings.Trim(slug, "-")
+
+	// Default if empty
+	if slug == "" {
+		slug = "profile"
+	}
+
+	// Ensure uniqueness by checking against other profiles
+	baseSlug := slug
+	counter := 1
+	for {
+		unique := true
+		for i, p := range profiles {
+			if i != currentIndex && p.ID == slug {
+				unique = false
+				break
+			}
+		}
+		if unique {
+			break
+		}
+		counter++
+		slug = fmt.Sprintf("%s-%d", baseSlug, counter)
+	}
+
+	return slug
 }
 
 func (h *Handlers) jsonError(w http.ResponseWriter, message string, status int) {

@@ -97,7 +97,8 @@ type PageData struct {
 	EndpointsPath         string
 	ActiveSymlink         string
 	Port                  int
-	PostActivationCommand string
+	PostActivationCommand string // Deprecated: use ActivationProfiles
+	ActivationProfiles    []config.ActivationProfile
 	Commands              []models.Command
 	Devices               []config.Device
 	Endpoints             []models.Endpoint
@@ -131,6 +132,7 @@ func (h *Handlers) defaultPageData(view, title string) PageData {
 		ActiveSymlink:         h.config.ActiveSymlink,
 		Port:                  h.config.Port,
 		PostActivationCommand: h.config.PostActivationCommand,
+		ActivationProfiles:    h.config.ActivationProfiles,
 		Devices:               h.config.Devices,
 		Commands:              h.config.Commands,
 	}

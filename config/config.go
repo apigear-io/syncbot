@@ -24,6 +24,13 @@ type Device struct {
 	Location    string `yaml:"location" json:"location"`
 }
 
+// ActivationProfile represents a named activation command configuration
+type ActivationProfile struct {
+	ID      string `yaml:"id" json:"id"`
+	Name    string `yaml:"name" json:"name"`
+	Command string `yaml:"command" json:"command"`
+}
+
 // TerminalConfig stores settings for the web terminal feature
 // Authentication is handled client-side with credentials in localStorage
 type TerminalConfig struct {
@@ -39,7 +46,10 @@ type Config struct {
 	// Paths
 	EndpointsPath         string `yaml:"endpoints_path"`
 	ActiveSymlink         string `yaml:"active_symlink"`
-	PostActivationCommand string `yaml:"post_activation_command"`
+	PostActivationCommand string `yaml:"post_activation_command"` // Deprecated: use ActivationProfiles
+
+	// Activation profiles (named command configurations)
+	ActivationProfiles []ActivationProfile `yaml:"activation_profiles"`
 
 	// Network
 	Port        int    `yaml:"port"`
@@ -112,6 +122,19 @@ func Load(path string) (*Config, error) {
 		cfg.Terminal.Shell = "/bin/bash"
 	}
 
+	// Migrate legacy PostActivationCommand to ActivationProfiles
+	if len(cfg.ActivationProfiles) == 0 && cfg.PostActivationCommand != "" {
+		cfg.ActivationProfiles = []ActivationProfile{
+			{
+				ID:      "default",
+				Name:    "Default",
+				Command: cfg.PostActivationCommand,
+			},
+		}
+		// Clear the legacy field after migration
+		cfg.PostActivationCommand = ""
+	}
+
 	cfg.configPath = path
 
 	return &cfg, nil
@@ -127,5 +150,23 @@ func (c *Config) Save() error {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
+	return nil
+}
+
+// GetActivationProfile returns an activation profile by ID, or nil if not found
+func (c *Config) GetActivationProfile(id string) *ActivationProfile {
+	for i := range c.ActivationProfiles {
+		if c.ActivationProfiles[i].ID == id {
+			return &c.ActivationProfiles[i]
+		}
+	}
+	return nil
+}
+
+// GetDefaultActivationProfile returns the first profile, or nil if none exist
+func (c *Config) GetDefaultActivationProfile() *ActivationProfile {
+	if len(c.ActivationProfiles) > 0 {
+		return &c.ActivationProfiles[0]
+	}
 	return nil
 }
