@@ -1,0 +1,308 @@
+{{define "content"}}
+<div class="card">
+  <div class="card-header">
+    <h3 class="card-title">Activation Logs</h3>
+    <div class="card-actions">
+      <div id="batch-actions" class="d-none me-2">
+        <button class="btn btn-danger" onclick="deleteSelectedLogs()" title="Delete selected">
+          <i class="ti ti-trash"></i>
+          Delete Selected (<span id="selected-count">0</span>)
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-vcenter card-table table-striped">
+        <thead>
+          <tr>
+            <th class="w-1">
+              <input type="checkbox" class="form-check-input" id="select-all" onchange="toggleSelectAll(this)">
+            </th>
+            <th>Log File</th>
+            <th>Endpoint</th>
+            <th>Size</th>
+            <th>Started</th>
+            <th class="w-1">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="logs-tbody">
+          <tr>
+            <td colspan="6" class="text-center text-muted">Loading...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card-footer">
+    <span class="text-muted" id="logs-count">0 logs</span>
+  </div>
+</div>
+
+<!-- View Log Modal -->
+<div class="modal modal-lg fade" id="view-log-modal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-scrollable" style="max-width: 90%;">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">View Log: <span id="view-log-filename"></span></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="mb-2 p-2 border-bottom d-flex align-items-center gap-2">
+          <div class="input-group input-group-sm" style="width: 300px;">
+            <span class="input-group-text"><i class="ti ti-search"></i></span>
+            <input type="text" class="form-control" id="log-filter" placeholder="Filter log content..." oninput="filterLogContent()">
+            <button class="btn btn-outline-secondary" type="button" onclick="clearLogFilter()" title="Clear filter">
+              <i class="ti ti-x"></i>
+            </button>
+          </div>
+          <span class="text-muted small" id="log-line-count"></span>
+        </div>
+        <pre id="view-log-content" class="m-0 p-3 bg-dark text-light" style="height: 60vh; overflow-y: auto; font-family: 'SF Mono', 'Monaco', 'Menlo', monospace; font-size: 13px; white-space: pre-wrap;"></pre>
+      </div>
+      <div class="modal-footer">
+        <a id="view-log-download" href="#" class="btn btn-success" download>
+          <i class="ti ti-download"></i> Download
+        </a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{{end}}
+
+{{define "view-js"}}
+let selectedLogs = new Set();
+let currentLogContent = '';  // Store full content for filtering
+
+async function loadLogs() {
+  try {
+    const response = await fetch('/api/activation-logs');
+    const logs = await response.json();
+
+    const tbody = document.getElementById('logs-tbody');
+    selectedLogs.clear();
+    updateBatchActions();
+
+    if (!logs || logs.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No activation logs found.</td></tr>';
+      document.getElementById('logs-count').textContent = '0 logs';
+      document.getElementById('select-all').checked = false;
+      return;
+    }
+
+    tbody.innerHTML = logs.map(log => `
+      <tr data-filename="${escapeHtml(log.filename)}">
+        <td>
+          <input type="checkbox" class="form-check-input log-checkbox"
+                 value="${escapeHtml(log.filename)}"
+                 onchange="toggleSelection(this)">
+        </td>
+        <td><code class="small">${escapeHtml(log.filename)}</code></td>
+        <td><strong>${escapeHtml(log.endpoint_name)}</strong></td>
+        <td>${formatBytes(log.size)}</td>
+        <td>${formatLogDate(log.start_time)}</td>
+        <td>
+          <div class="btn-group">
+            <button class="btn btn-sm btn-primary" onclick="viewLog('${escapeHtml(log.filename)}')" title="View">
+              <i class="ti ti-eye"></i>
+            </button>
+            <a href="${log.download_url}" class="btn btn-sm btn-success" download title="Download">
+              <i class="ti ti-download"></i>
+            </a>
+            <button class="btn btn-sm btn-danger" onclick="deleteLog('${escapeHtml(log.filename)}')" title="Delete">
+              <i class="ti ti-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `).join('');
+
+    document.getElementById('logs-count').textContent = `${logs.length} log${logs.length !== 1 ? 's' : ''}`;
+    document.getElementById('select-all').checked = false;
+  } catch (error) {
+    console.error('Failed to load logs:', error);
+    document.getElementById('logs-tbody').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Failed to load logs</td></tr>';
+  }
+}
+
+async function viewLog(filename) {
+  document.getElementById('view-log-filename').textContent = filename;
+  document.getElementById('view-log-content').textContent = 'Loading...';
+  document.getElementById('view-log-download').href = `/api/activation-logs/${encodeURIComponent(filename)}/download`;
+  document.getElementById('log-filter').value = '';
+  document.getElementById('log-line-count').textContent = '';
+  currentLogContent = '';
+
+  new bootstrap.Modal(document.getElementById('view-log-modal')).show();
+
+  try {
+    // Load up to 512KB for viewing
+    const response = await fetch(`/api/activation-logs/${encodeURIComponent(filename)}?tail=524288`);
+    const data = await response.json();
+
+    if (response.ok) {
+      currentLogContent = data.content || '(empty log)';
+      document.getElementById('view-log-content').textContent = currentLogContent;
+      updateLogLineCount();
+    } else {
+      document.getElementById('view-log-content').textContent = 'Error: ' + (data.error || 'Failed to load log');
+    }
+  } catch (error) {
+    document.getElementById('view-log-content').textContent = 'Error: Failed to load log';
+  }
+}
+
+function filterLogContent() {
+  const filterText = document.getElementById('log-filter').value.toLowerCase();
+  const display = document.getElementById('view-log-content');
+
+  if (!filterText) {
+    display.textContent = currentLogContent;
+  } else {
+    const filteredLines = currentLogContent.split('\n').filter(line =>
+      line.toLowerCase().includes(filterText)
+    );
+    display.textContent = filteredLines.join('\n') || '(no matches)';
+  }
+  updateLogLineCount();
+}
+
+function clearLogFilter() {
+  document.getElementById('log-filter').value = '';
+  filterLogContent();
+}
+
+function updateLogLineCount() {
+  const display = document.getElementById('view-log-content');
+  const filterText = document.getElementById('log-filter').value;
+  const totalLines = currentLogContent.split('\n').length;
+  const displayedLines = display.textContent.split('\n').length;
+
+  if (filterText) {
+    document.getElementById('log-line-count').textContent = `${displayedLines} of ${totalLines} lines`;
+  } else {
+    document.getElementById('log-line-count').textContent = `${totalLines} lines`;
+  }
+}
+
+function formatLogDate(dateStr) {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleString();
+}
+
+function toggleSelectAll(checkbox) {
+  const checkboxes = document.querySelectorAll('.log-checkbox');
+  checkboxes.forEach(cb => {
+    cb.checked = checkbox.checked;
+    if (checkbox.checked) {
+      selectedLogs.add(cb.value);
+    } else {
+      selectedLogs.delete(cb.value);
+    }
+  });
+  updateBatchActions();
+}
+
+function toggleSelection(checkbox) {
+  if (checkbox.checked) {
+    selectedLogs.add(checkbox.value);
+  } else {
+    selectedLogs.delete(checkbox.value);
+  }
+
+  const allCheckboxes = document.querySelectorAll('.log-checkbox');
+  const selectAll = document.getElementById('select-all');
+  selectAll.checked = selectedLogs.size === allCheckboxes.length && allCheckboxes.length > 0;
+
+  updateBatchActions();
+}
+
+function updateBatchActions() {
+  const batchActions = document.getElementById('batch-actions');
+  const selectedCount = document.getElementById('selected-count');
+
+  if (selectedLogs.size > 0) {
+    batchActions.classList.remove('d-none');
+    selectedCount.textContent = selectedLogs.size;
+  } else {
+    batchActions.classList.add('d-none');
+  }
+}
+
+async function deleteLog(filename) {
+  if (!confirm(`Are you sure you want to delete log "${filename}"?`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch(`/api/activation-logs/${encodeURIComponent(filename)}`, {
+      method: 'DELETE'
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete log');
+    }
+
+    showToast('Deleted', 'Log deleted successfully', 'success');
+    loadLogs();
+  } catch (error) {
+    console.error('Failed to delete log:', error);
+    showToast('Error', error.message || 'Failed to delete log', 'danger');
+  }
+}
+
+async function deleteSelectedLogs() {
+  const count = selectedLogs.size;
+  if (count === 0) return;
+
+  if (!confirm(`Are you sure you want to delete ${count} log${count > 1 ? 's' : ''}?`)) {
+    return;
+  }
+
+  const filenames = Array.from(selectedLogs);
+  let deleted = 0;
+  let failed = 0;
+
+  for (const filename of filenames) {
+    try {
+      const response = await fetch(`/api/activation-logs/${encodeURIComponent(filename)}`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        deleted++;
+      } else {
+        failed++;
+      }
+    } catch (error) {
+      failed++;
+    }
+  }
+
+  if (failed > 0) {
+    showToast('Warning', `Deleted ${deleted} log${deleted !== 1 ? 's' : ''}, ${failed} failed`, 'warning');
+  } else {
+    showToast('Deleted', `Deleted ${deleted} log${deleted !== 1 ? 's' : ''} successfully`, 'success');
+  }
+
+  loadLogs();
+}
+
+// Initial load
+loadLogs();
+{{end}}
+
+{{define "page-actions"}}
+<a href="/active" class="btn btn-secondary">
+  <i class="ti ti-player-play"></i>
+  Live View
+</a>
+<button class="btn btn-primary" onclick="loadLogs()">
+  <i class="ti ti-refresh"></i>
+  Refresh
+</button>
+{{end}}

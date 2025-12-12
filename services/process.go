@@ -33,10 +33,11 @@ type ProcessInfo struct {
 }
 
 type ProcessService struct {
-	mu       sync.RWMutex
-	cfg      *config.Config
-	logSvc   *LogService
-	eventSvc *EventService
+	mu               sync.RWMutex
+	cfg              *config.Config
+	logSvc           *LogService
+	eventSvc         *EventService
+	activationLogSvc *ActivationLogService
 
 	cmd          *exec.Cmd
 	state        ProcessState
@@ -50,13 +51,14 @@ type ProcessService struct {
 	cancel       context.CancelFunc
 }
 
-func NewProcessService(cfg *config.Config, logSvc *LogService, eventSvc *EventService) *ProcessService {
+func NewProcessService(cfg *config.Config, logSvc *LogService, eventSvc *EventService, activationLogSvc *ActivationLogService) *ProcessService {
 	return &ProcessService{
-		cfg:          cfg,
-		logSvc:       logSvc,
-		eventSvc:     eventSvc,
-		state:        ProcessStateIdle,
-		outputBuffer: NewRingBuffer(64 * 1024), // 64KB buffer
+		cfg:              cfg,
+		logSvc:           logSvc,
+		eventSvc:         eventSvc,
+		activationLogSvc: activationLogSvc,
+		state:            ProcessStateIdle,
+		outputBuffer:     NewRingBuffer(64 * 1024), // 64KB buffer
 	}
 }
 
@@ -108,6 +110,13 @@ func (s *ProcessService) StartProcess(endpointName, command string) error {
 
 	s.logSvc.Info("process", "Started post-activation command for endpoint: "+endpointName)
 
+	// Start activation log file
+	if s.activationLogSvc != nil {
+		if err := s.activationLogSvc.StartLog(endpointName); err != nil {
+			s.logSvc.Warn("process", "Failed to start activation log: "+err.Error())
+		}
+	}
+
 	// Publish process started event
 	s.eventSvc.Publish(Event{
 		Type: EventProcessStarted,
@@ -142,6 +151,11 @@ func (s *ProcessService) streamOutput(pipe io.ReadCloser, source string) {
 
 			// Write to output buffer
 			s.outputBuffer.Write(buf[:n])
+
+			// Write to activation log file
+			if s.activationLogSvc != nil {
+				s.activationLogSvc.Write(buf[:n])
+			}
 
 			// Publish output event
 			s.eventSvc.Publish(Event{
@@ -187,6 +201,11 @@ func (s *ProcessService) handleCompletion(err error) {
 		code := 0
 		s.exitCode = &code
 		s.logSvc.Info("process", "Process completed successfully")
+	}
+
+	// Close activation log file
+	if s.activationLogSvc != nil {
+		s.activationLogSvc.CloseLog()
 	}
 
 	// Publish process stopped event
@@ -236,6 +255,12 @@ func (s *ProcessService) KillProcess() error {
 		// Force kill if still running
 		s.logSvc.Warn("process", "Process did not respond to SIGTERM, sending SIGKILL")
 		process.Kill()
+	}
+
+	// Close activation log immediately so it's ready for the next activation
+	// (handleCompletion will also try to close but CloseLog is idempotent)
+	if s.activationLogSvc != nil {
+		s.activationLogSvc.CloseLog()
 	}
 
 	return nil

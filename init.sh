@@ -10,6 +10,12 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m'
 
+# Check if device is online (ping with 2 second timeout)
+is_device_online() {
+    local host="$1"
+    ping -c 1 -W 2 "$host" >/dev/null 2>&1
+}
+
 usage() {
     echo "Usage: $0 [options]"
     echo ""
@@ -51,20 +57,38 @@ while IFS= read -r device || [ -n "$device" ]; do
     [[ -z "$device" || "$device" =~ ^# ]] && continue
 
     USERNAME="${device%%@*}"
+    HOST="${device##*@}"
 
     echo -e "${YELLOW}=== Initializing $device ===${NC}"
+
+    # Check if device is online
+    if ! is_device_online "$HOST"; then
+        echo -e "  ${RED}Offline - skipping${NC}"
+        echo ""
+        continue
+    fi
+
+    # Use sudo -S to read password from stdin if SSHPASS is set
+    SUDO_CMD="sudo"
+    if [ -n "$SSHPASS" ]; then
+        SUDO_PREFIX="echo '$SSHPASS' |"
+        SUDO_CMD="sudo -S"
+    else
+        SUDO_PREFIX=""
+    fi
 
     $SSH_CMD -n "$device" "
         set -e
         USERNAME='$USERNAME'
         SYNCBOT_DIR=\"/home/\$USERNAME/syncbot\"
+        SUDO_PREFIX='$SUDO_PREFIX'
+        SUDO_CMD='$SUDO_CMD'
 
         echo '  Creating directory:' \$SYNCBOT_DIR
         mkdir -p \"\$SYNCBOT_DIR\"
 
         echo '  Installing systemd service...'
-        sudo tee /etc/systemd/system/syncbot.service > /dev/null << EOF
-[Unit]
+        SERVICE_CONTENT=\"[Unit]
 Description=SyncBot - Endpoint Management
 After=network.target
 
@@ -77,11 +101,17 @@ Restart=on-failure
 RestartSec=5
 
 [Install]
-WantedBy=multi-user.target
-EOF
+WantedBy=multi-user.target\"
 
-        sudo systemctl daemon-reload
-        sudo systemctl enable syncbot
+        # Write service file to temp location first, then move with sudo
+        TEMP_SERVICE=\"/tmp/syncbot.service.\$\$\"
+        echo \"\$SERVICE_CONTENT\" > \"\$TEMP_SERVICE\"
+
+        \$SUDO_CMD cp \"\$TEMP_SERVICE\" /etc/systemd/system/syncbot.service
+        rm -f \"\$TEMP_SERVICE\"
+        \$SUDO_CMD systemctl unmask syncbot 2>/dev/null || true
+        \$SUDO_CMD systemctl daemon-reload
+        \$SUDO_CMD systemctl enable syncbot
         echo '  Service installed and enabled'
     "
 

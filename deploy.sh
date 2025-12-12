@@ -12,6 +12,12 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
+# Check if device is online (ping with 2 second timeout)
+is_device_online() {
+    local host="$1"
+    ping -c 1 -W 2 "$host" >/dev/null 2>&1
+}
+
 usage() {
     echo "Usage: $0 [options]"
     echo ""
@@ -77,10 +83,18 @@ while IFS= read -r device || [ -n "$device" ]; do
     [[ -z "$device" || "$device" =~ ^# ]] && continue
 
     USERNAME="${device%%@*}"
+    HOST="${device##*@}"
     REMOTE_DIR="/home/$USERNAME/syncbot"
     REMOTE_BINARY="$REMOTE_DIR/syncbot"
 
     echo -e "${YELLOW}=== $device ===${NC}"
+
+    # Check if device is online
+    if ! is_device_online "$HOST"; then
+        echo -e "  ${RED}Offline - skipping${NC}"
+        echo ""
+        continue
+    fi
 
     # Check if binary needs updating
     if [ "$FORCE" = false ]; then
@@ -101,13 +115,24 @@ while IFS= read -r device || [ -n "$device" ]; do
         continue
     fi
 
+    # Use sudo -S to read password from stdin if SSHPASS is set
+    SUDO_CMD="sudo"
+    if [ -n "$SSHPASS" ]; then
+        SUDO_PREFIX="echo '$SSHPASS' |"
+        SUDO_CMD="sudo -S"
+    else
+        SUDO_PREFIX=""
+    fi
+
     echo "  Restarting service..."
     $SSH_CMD -n "$device" "
         REMOTE_DIR='$REMOTE_DIR'
-        sudo systemctl stop syncbot 2>/dev/null || true
+        SUDO_PREFIX='$SUDO_PREFIX'
+        SUDO_CMD='$SUDO_CMD'
+        eval \"\$SUDO_PREFIX \$SUDO_CMD systemctl stop syncbot\" 2>/dev/null || true
         mv ~/syncbot-new \"\$REMOTE_DIR/syncbot\"
         chmod +x \"\$REMOTE_DIR/syncbot\"
-        sudo systemctl start syncbot
+        eval \"\$SUDO_PREFIX \$SUDO_CMD systemctl start syncbot\"
         sleep 1
         systemctl is-active --quiet syncbot && echo '  Service running' || echo '  Warning: Service may not have started'
     "

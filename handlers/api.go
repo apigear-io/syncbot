@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -992,4 +993,104 @@ func (h *Handlers) GetProcessOutput(w http.ResponseWriter, r *http.Request) {
 func (h *Handlers) ClearProcessOutput(w http.ResponseWriter, r *http.Request) {
 	h.processService.ClearOutputBuffer()
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// Activation Log API handlers
+
+// ListActivationLogs returns all activation logs
+// GET /api/activation-logs
+func (h *Handlers) ListActivationLogs(w http.ResponseWriter, r *http.Request) {
+	logs, err := h.activationLogService.ListLogs()
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	// Convert to response type with download URLs
+	var response []map[string]interface{}
+	for _, log := range logs {
+		response = append(response, map[string]interface{}{
+			"filename":      log.Filename,
+			"endpoint_name": log.EndpointName,
+			"start_time":    log.StartTime,
+			"size":          log.Size,
+			"download_url":  fmt.Sprintf("/api/activation-logs/%s/download", log.Filename),
+		})
+	}
+
+	if response == nil {
+		response = []map[string]interface{}{}
+	}
+
+	writeJSON(w, http.StatusOK, response)
+}
+
+// GetActivationLog returns the content of a specific log (for viewing)
+// GET /api/activation-logs/{filename}
+func (h *Handlers) GetActivationLog(w http.ResponseWriter, r *http.Request) {
+	filename := chi.URLParam(r, "filename")
+
+	// Check for tail parameter (for live view reconnects)
+	tailBytes := int64(64 * 1024) // Default 64KB tail
+	if tailParam := r.URL.Query().Get("tail"); tailParam != "" {
+		if val, err := strconv.ParseInt(tailParam, 10, 64); err == nil && val > 0 {
+			tailBytes = val
+		}
+	}
+
+	content, err := h.activationLogService.ReadLogTail(filename, tailBytes)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]string{"content": string(content)})
+}
+
+// DownloadActivationLog serves a log file for download
+// GET /api/activation-logs/{filename}/download
+func (h *Handlers) DownloadActivationLog(w http.ResponseWriter, r *http.Request) {
+	filename := chi.URLParam(r, "filename")
+
+	logPath, err := h.activationLogService.GetLogPath(filename)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s", filename))
+	w.Header().Set("Content-Type", "text/plain")
+	http.ServeFile(w, r, logPath)
+}
+
+// DeleteActivationLog deletes a log file
+// DELETE /api/activation-logs/{filename}
+func (h *Handlers) DeleteActivationLog(w http.ResponseWriter, r *http.Request) {
+	filename := chi.URLParam(r, "filename")
+
+	if err := h.activationLogService.DeleteLog(filename); err != nil {
+		status := http.StatusNotFound
+		if strings.Contains(err.Error(), "failed to delete") {
+			status = http.StatusInternalServerError
+		}
+		writeJSON(w, status, ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// GetCurrentActivationLog returns info about the currently active log
+// GET /api/activation-logs/current
+func (h *Handlers) GetCurrentActivationLog(w http.ResponseWriter, r *http.Request) {
+	currentName := h.activationLogService.GetCurrentLogName()
+	if currentName == "" {
+		writeJSON(w, http.StatusOK, map[string]interface{}{"active": false})
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"active":   true,
+		"filename": currentName,
+	})
 }

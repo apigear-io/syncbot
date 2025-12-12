@@ -48,6 +48,12 @@
               </a>
             </li>
             <li class="nav-item">
+              <a class="nav-link{{if eq .ActiveView "activation-logs"}} active{{end}}" href="/activation-logs">
+                <span class="nav-link-icon"><i class="ti ti-history"></i></span>
+                <span class="nav-link-title">Activation Logs</span>
+              </a>
+            </li>
+            <li class="nav-item">
               <a class="nav-link{{if eq .ActiveView "devices"}} active{{end}}" href="/devices">
                 <span class="nav-link-icon"><i class="ti ti-devices"></i></span>
                 <span class="nav-link-title">Devices</span>

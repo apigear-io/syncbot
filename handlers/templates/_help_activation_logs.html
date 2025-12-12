@@ -1,0 +1,31 @@
+{{define "view-help"}}
+<h5>Activation Logs</h5>
+<p>This page shows historical logs from endpoint activations. Each log captures the full output from post-activation commands.</p>
+
+<h6>Features</h6>
+<ul>
+  <li><strong>View</strong> - Open the log content in a modal with search/filter</li>
+  <li><strong>Download</strong> - Download the complete log file</li>
+  <li><strong>Delete</strong> - Remove individual or multiple logs</li>
+  <li><strong>Batch Delete</strong> - Select multiple logs and delete them at once</li>
+</ul>
+
+<h6>Log Files</h6>
+<p>Logs are named using the pattern: <code>{endpoint}_{timestamp}.log</code></p>
+<p>Example: <code>my-endpoint_20250115-143052.log</code></p>
+
+<h6>Log Rotation</h6>
+<p>Logs are automatically managed:</p>
+<ul>
+  <li>Maximum 10 MB per log file (rotates if exceeded)</li>
+  <li>Keeps up to 5 rotated backups</li>
+  <li>Old logs cleaned up after 30 days</li>
+  <li>Rotated files are compressed (.log.gz)</li>
+</ul>
+
+<h6>Log Location</h6>
+<p>Logs are stored at:<br><code>{{.EndpointsPath}}/.syncbot-logs/</code></p>
+
+<h6>Live View</h6>
+<p>Click "Live View" to go to the Active page and see real-time command output as it happens.</p>
+{{end}}

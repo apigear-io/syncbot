@@ -15,20 +15,21 @@ import (
 var templatesFS embed.FS
 
 type Handlers struct {
-	config            *config.Config
-	endpointService   *services.EndpointService
-	activationService *services.ActivationService
-	commandService    *services.CommandService
-	backupService     *services.BackupService
-	logService        *services.LogService
-	eventService      *services.EventService
-	authService       *services.AuthService
-	termService       *services.TerminalService
-	processService    *services.ProcessService
-	viewTemplates     map[string]*template.Template
+	config               *config.Config
+	endpointService      *services.EndpointService
+	activationService    *services.ActivationService
+	commandService       *services.CommandService
+	backupService        *services.BackupService
+	logService           *services.LogService
+	eventService         *services.EventService
+	authService          *services.AuthService
+	termService          *services.TerminalService
+	processService       *services.ProcessService
+	activationLogService *services.ActivationLogService
+	viewTemplates        map[string]*template.Template
 }
 
-func NewHandlers(cfg *config.Config, endpointSvc *services.EndpointService, activationSvc *services.ActivationService, commandSvc *services.CommandService, backupSvc *services.BackupService, logSvc *services.LogService, eventSvc *services.EventService, authSvc *services.AuthService, termSvc *services.TerminalService, processSvc *services.ProcessService) (*Handlers, error) {
+func NewHandlers(cfg *config.Config, endpointSvc *services.EndpointService, activationSvc *services.ActivationService, commandSvc *services.CommandService, backupSvc *services.BackupService, logSvc *services.LogService, eventSvc *services.EventService, authSvc *services.AuthService, termSvc *services.TerminalService, processSvc *services.ProcessService, activationLogSvc *services.ActivationLogService) (*Handlers, error) {
 	// Shared template files
 	sharedFiles := []string{
 		"templates/base.html",
@@ -39,15 +40,16 @@ func NewHandlers(cfg *config.Config, endpointSvc *services.EndpointService, acti
 
 	// View-specific template files with their help partials
 	views := map[string][]string{
-		"endpoints": {"templates/endpoints.html", "templates/_help_endpoints.html"},
-		"devices":   {"templates/devices.html", "templates/_help_devices.html"},
-		"commands":  {"templates/commands.html", "templates/_help_commands.html"},
-		"logs":      {"templates/logs.html", "templates/_help_logs.html"},
-		"settings":  {"templates/settings.html", "templates/_help_settings.html"},
-		"sync":      {"templates/sync.html", "templates/_help_sync.html"},
-		"terminal":  {"templates/terminal.html", "templates/_help_terminal.html"},
-		"backups":   {"templates/backups.html", "templates/_help_backups.html"},
-		"active":    {"templates/active.html", "templates/_help_active.html"},
+		"endpoints":       {"templates/endpoints.html", "templates/_help_endpoints.html"},
+		"devices":         {"templates/devices.html", "templates/_help_devices.html"},
+		"commands":        {"templates/commands.html", "templates/_help_commands.html"},
+		"logs":            {"templates/logs.html", "templates/_help_logs.html"},
+		"settings":        {"templates/settings.html", "templates/_help_settings.html"},
+		"sync":            {"templates/sync.html", "templates/_help_sync.html"},
+		"terminal":        {"templates/terminal.html", "templates/_help_terminal.html"},
+		"backups":         {"templates/backups.html", "templates/_help_backups.html"},
+		"active":          {"templates/active.html", "templates/_help_active.html"},
+		"activation-logs": {"templates/activation-logs.html", "templates/_help_activation_logs.html"},
 	}
 
 	viewTemplates := make(map[string]*template.Template)
@@ -63,17 +65,18 @@ func NewHandlers(cfg *config.Config, endpointSvc *services.EndpointService, acti
 	}
 
 	return &Handlers{
-		config:            cfg,
-		endpointService:   endpointSvc,
-		activationService: activationSvc,
-		commandService:    commandSvc,
-		backupService:     backupSvc,
-		logService:        logSvc,
-		eventService:      eventSvc,
-		authService:       authSvc,
-		termService:       termSvc,
-		processService:    processSvc,
-		viewTemplates:     viewTemplates,
+		config:               cfg,
+		endpointService:      endpointSvc,
+		activationService:    activationSvc,
+		commandService:       commandSvc,
+		backupService:        backupSvc,
+		logService:           logSvc,
+		eventService:         eventSvc,
+		authService:          authSvc,
+		termService:          termSvc,
+		processService:       processSvc,
+		activationLogService: activationLogSvc,
+		viewTemplates:        viewTemplates,
 	}, nil
 }
 
@@ -175,4 +178,8 @@ func (h *Handlers) ActivePage(w http.ResponseWriter, r *http.Request) {
 	data := h.defaultPageData("active", "Active")
 	data.ActiveEndpoint = h.activationService.GetActive()
 	h.renderPage(w, "active", data)
+}
+
+func (h *Handlers) ActivationLogsPage(w http.ResponseWriter, r *http.Request) {
+	h.renderPage(w, "activation-logs", h.defaultPageData("activation-logs", "Activation Logs"))
 }

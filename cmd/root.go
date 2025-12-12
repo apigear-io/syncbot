@@ -74,7 +74,12 @@ func runServer(cmd *cobra.Command, args []string) {
 	}
 
 	eventSvc := services.NewEventService(logSvc)
-	processSvc := services.NewProcessService(cfg, logSvc, eventSvc)
+	activationLogSvc, err := services.NewActivationLogService(cfg, logSvc)
+	if err != nil {
+		logSvc.Error("startup", "Failed to initialize activation log service: "+err.Error())
+		os.Exit(1)
+	}
+	processSvc := services.NewProcessService(cfg, logSvc, eventSvc, activationLogSvc)
 	activationSvc := services.NewActivationService(cfg, logSvc, eventSvc, processSvc)
 	endpointSvc := services.NewEndpointService(cfg, activationSvc, logSvc, eventSvc)
 	commandSvc := services.NewCommandService(cfg, logSvc, eventSvc, activationSvc)
@@ -86,7 +91,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	authSvc := services.NewAuthService(cfg, logSvc)
 	termSvc := services.NewTerminalService(cfg, authSvc, logSvc)
 
-	h, err := handlers.NewHandlers(cfg, endpointSvc, activationSvc, commandSvc, backupSvc, logSvc, eventSvc, authSvc, termSvc, processSvc)
+	h, err := handlers.NewHandlers(cfg, endpointSvc, activationSvc, commandSvc, backupSvc, logSvc, eventSvc, authSvc, termSvc, processSvc, activationLogSvc)
 	if err != nil {
 		logSvc.Error("startup", "Failed to initialize handlers: "+err.Error())
 		os.Exit(1)
@@ -110,6 +115,7 @@ func runServer(cmd *cobra.Command, args []string) {
 	r.Get("/sync", h.SyncPage)
 	r.Get("/terminal", h.TerminalPage)
 	r.Get("/backups", h.BackupsPage)
+	r.Get("/activation-logs", h.ActivationLogsPage)
 
 	// API routes
 	r.Route("/api", func(r chi.Router) {
@@ -163,6 +169,13 @@ func runServer(cmd *cobra.Command, args []string) {
 		r.Post("/terminal/logout", h.TerminalLogout)
 		r.Get("/terminal/session", h.TerminalSession)
 		r.Get("/terminal/ws", h.TerminalWS)
+
+		// Activation log routes
+		r.Get("/activation-logs", h.ListActivationLogs)
+		r.Get("/activation-logs/current", h.GetCurrentActivationLog)
+		r.Get("/activation-logs/{filename}", h.GetActivationLog)
+		r.Get("/activation-logs/{filename}/download", h.DownloadActivationLog)
+		r.Delete("/activation-logs/{filename}", h.DeleteActivationLog)
 	})
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
